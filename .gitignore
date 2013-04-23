@@ -1,0 +1,9 @@
+*.user
+*.ncb
+*.suo
+*.ilk
+*.sdf
+*.opensdf
+*.pdb
+_ReSharper.*
+build
