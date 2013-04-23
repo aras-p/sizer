@@ -1,0 +1,21 @@
+0.1.4, 2010 10 14
+	lucas: convert projectfile to vs2008
+	lucas: add support for reading vs2008 generated pdb's
+
+0.1.3, 2008 01 17
+	aras: fixed a crash on some executables (IDiaSymbol2::get_type may return S_ERROR). Reported by Ivan-Assen Ivanov.
+	aras: print a dot for each 1000 symbols read. Some executables spend ages inside DIA dlls.
+	
+0.1.2, 2008 01 14
+	ryg: added support for VC8.0 DIA DLL
+	ryg: added support for loading DIA DLLs that are not registered (drop msdia*.dll into app folder)
+	ryg: split up "data" report into data and BSS (uninitialized data) sections
+	ryg: fixed some size computations
+	aras: strip whitespace from symbol names (often happens with templates)
+
+0.1.1, 2008 01 13
+	aras: improved error messages
+	aras: removed unused source files
+
+0.1, 2008 01 13
+	initial release
