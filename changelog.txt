@@ -1,3 +1,6 @@
+0.1.5, 2013 04 23
+	aras: converted project files to VS2010
+
 0.1.4, 2010 10 14
 	lucas: convert projectfile to vs2008
 	lucas: add support for reading vs2008 generated pdb's
