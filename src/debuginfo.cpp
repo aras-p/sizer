@@ -146,14 +146,14 @@ void DebugInfo::FinishedReading()
 
     if(newSize || in->Class == DIC_END)
     {
-    Symbols.push_back(DISymbol());
-    DISymbol *out = &Symbols.back();
-    *out = *in;
-    out->VA = newVA;
-    out->Size = newSize;
-      
-    oldVA = newVA + newSize;
-    oldSize = newSize;
+      Symbols.push_back(DISymbol());
+      DISymbol *out = &Symbols.back();
+      *out = *in;
+      out->VA = newVA;
+      out->Size = newSize;
+        
+      oldVA = newVA + newSize;
+      oldSize = newSize;
     }
   }
 
@@ -343,8 +343,8 @@ std::string DebugInfo::WriteReport()
 
   for(i=0;i<Symbols.size();i++)
   {
-  if( Symbols[i].Size < kMinSymbolSize )
-    break;
+    if( Symbols[i].Size < kMinSymbolSize )
+      break;
     if(Symbols[i].Class == DIC_CODE)
       sAppendPrintF(Report,"%5d.%02d: %-50s %s\n",
         Symbols[i].Size/1024,(Symbols[i].Size%1024)*100/1024,
