@@ -1,3 +1,6 @@
+0.1.6, 2014 03 15
+	ryg: add support for VS2010 and VS2012 DIA SDKs
+
 0.1.5, 2013 04 23
 	aras: converted project files to VS2010
 
