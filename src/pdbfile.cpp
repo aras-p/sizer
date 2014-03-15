@@ -303,6 +303,8 @@ public:
 class DECLSPEC_UUID("e60afbee-502d-46ae-858f-8272a09bd707") DiaSource71;
 class DECLSPEC_UUID("bce36434-2c24-499e-bf49-8bd99b0eeb68") DiaSource80;
 class DECLSPEC_UUID("4C41678E-887B-4365-A09E-925D28DB33C2") DiaSource90;
+class DECLSPEC_UUID("B86AE24D-BF2F-4ac9-B5A2-34B14E4CE11D") DiaSource100;
+class DECLSPEC_UUID("761D3BCD-1304-41D5-94E8-EAC54E4AC172") DiaSource110;
 class DECLSPEC_UUID("79f1bb5f-b66e-48e5-b6a9-1545c323ca3d") IDiaDataSource;
 
 /****************************************************************************/
@@ -313,8 +315,8 @@ struct PDBFileReader::SectionContrib
   DWORD Offset;
   DWORD Length;
   DWORD Compiland;
-	sInt Type;
-	sInt ObjFile;
+  sInt Type;
+  sInt ObjFile;
 };
 
 const PDBFileReader::SectionContrib *PDBFileReader::ContribFromSectionOffset(sU32 sec,sU32 offs)
@@ -333,10 +335,10 @@ const PDBFileReader::SectionContrib *PDBFileReader::ContribFromSectionOffset(sU3
       r = x;
     else if(sec > cur.Section || sec == cur.Section && offs >= cur.Offset + cur.Length)
       l = x+1;
-		else if(sec == cur.Section && offs >= cur.Offset && offs < cur.Offset + cur.Length) // we got a winner
-			return &cur;
-		else
-			break; // there's nothing here!
+    else if(sec == cur.Section && offs >= cur.Offset && offs < cur.Offset + cur.Length) // we got a winner
+      return &cur;
+    else
+      break; // there's nothing here!
   }
 
   // normally, this shouldn't happen!
@@ -359,14 +361,14 @@ static sChar *BStrToString( BSTR str, sChar *defString = "", bool stripWhitespac
     sInt len = SysStringLen(str);
     sChar *buffer = new sChar[len+1];
 
-	sInt j = 0;
+  sInt j = 0;
     for( sInt i=0;i<len;i++ )
-	{
-		if( stripWhitespace && isspace(str[i]) )
-			continue;
-		buffer[j] = (str[i] >= 32 && str[i] < 128) ? str[i] : '?';
-		++j;
-	}
+  {
+    if( stripWhitespace && isspace(str[i]) )
+      continue;
+    buffer[j] = (str[i] >= 32 && str[i] < 128) ? str[i] : '?';
+    ++j;
+  }
 
     buffer[j] = 0;
 
@@ -385,66 +387,66 @@ static sInt GetBStr(BSTR str,sChar *defString,DebugInfo &to)
 
 void PDBFileReader::ProcessSymbol(IDiaSymbol *symbol,DebugInfo &to)
 {
-	// print a dot for each 1000 symbols processed
-	static int counter = 0;
-	++counter;
-	if( counter == 1000 ) {
-		fputc( '.', stderr );
-		counter = 0;
-	}
+  // print a dot for each 1000 symbols processed
+  static int counter = 0;
+  ++counter;
+  if( counter == 1000 ) {
+    fputc( '.', stderr );
+    counter = 0;
+  }
 
-	DWORD section,offset,rva;
-	enum SymTagEnum tag;
-	ULONGLONG length = 0;
-	BSTR name = 0, srcFileName = 0;
+  DWORD section,offset,rva;
+  enum SymTagEnum tag;
+  ULONGLONG length = 0;
+  BSTR name = 0, srcFileName = 0;
 
-	symbol->get_symTag((DWORD *) &tag);
-	symbol->get_relativeVirtualAddress(&rva);
-	symbol->get_length(&length);
-	symbol->get_addressSection(&section);
-	symbol->get_addressOffset(&offset);
+  symbol->get_symTag((DWORD *) &tag);
+  symbol->get_relativeVirtualAddress(&rva);
+  symbol->get_length(&length);
+  symbol->get_addressSection(&section);
+  symbol->get_addressOffset(&offset);
 
-	// get length from type for data
-	if( tag == SymTagData )
-	{
-		IDiaSymbol *type = NULL;
-		if( symbol->get_type(&type) == S_OK ) // no SUCCEEDED test as may return S_FALSE!
-		{
-			if( FAILED(type->get_length(&length)) )
-				length = 0;
-			type->Release();
-		}
-		else
-			length = 0;
-	}
+  // get length from type for data
+  if( tag == SymTagData )
+  {
+    IDiaSymbol *type = NULL;
+    if( symbol->get_type(&type) == S_OK ) // no SUCCEEDED test as may return S_FALSE!
+    {
+      if( FAILED(type->get_length(&length)) )
+	length = 0;
+      type->Release();
+    }
+    else
+      length = 0;
+  }
 
-	const SectionContrib *contrib = ContribFromSectionOffset(section,offset);
-	sInt objFile = 0;
-	sInt sectionType = DIC_UNKNOWN;
+  const SectionContrib *contrib = ContribFromSectionOffset(section,offset);
+  sInt objFile = 0;
+  sInt sectionType = DIC_UNKNOWN;
 
-	if(contrib)
-	{
-		objFile = contrib->ObjFile;
-		sectionType = contrib->Type;
-	}
+  if(contrib)
+  {
+    objFile = contrib->ObjFile;
+    sectionType = contrib->Type;
+  }
 
-	symbol->get_name(&name);
+  symbol->get_name(&name);
 
-	// fill out structure
-	sChar *nameStr = BStrToString( name, "<noname>", true);
+  // fill out structure
+  sChar *nameStr = BStrToString( name, "<noname>", true);
 
-	to.Symbols.push_back( DISymbol() );
-	DISymbol *outSym = &to.Symbols.back();
-	outSym->name = outSym->mangledName = to.MakeString(nameStr);
-	outSym->objFileNum = objFile;
-	outSym->VA = rva;
-	outSym->Size = (sU32) length;
-	outSym->Class = sectionType;
-	outSym->NameSpNum = to.GetNameSpaceByName(nameStr);
+  to.Symbols.push_back( DISymbol() );
+  DISymbol *outSym = &to.Symbols.back();
+  outSym->name = outSym->mangledName = to.MakeString(nameStr);
+  outSym->objFileNum = objFile;
+  outSym->VA = rva;
+  outSym->Size = (sU32) length;
+  outSym->Class = sectionType;
+  outSym->NameSpNum = to.GetNameSpaceByName(nameStr);
 
-	// clean up
-	delete[] nameStr;
-	if(name)         SysFreeString(name);
+  // clean up
+  delete[] nameStr;
+  if(name)         SysFreeString(name);
 }
 
 void PDBFileReader::ReadEverything(DebugInfo &to)
@@ -481,36 +483,36 @@ void PDBFileReader::ReadEverything(DebugInfo &to)
         item->get_length(&contrib.Length);
         item->get_compilandId(&contrib.Compiland);
 
-				BOOL code=FALSE,initData=FALSE,uninitData=FALSE;
-				item->get_code(&code);
-				item->get_initializedData(&initData);
-				item->get_uninitializedData(&uninitData);
+	BOOL code=FALSE,initData=FALSE,uninitData=FALSE;
+	item->get_code(&code);
+	item->get_initializedData(&initData);
+	item->get_uninitializedData(&uninitData);
 
-				if(code && !initData && !uninitData)
-					contrib.Type = DIC_CODE;
-				else if(!code && initData && !uninitData)
-					contrib.Type = DIC_DATA;
-				else if(!code && !initData && uninitData)
-					contrib.Type = DIC_BSS;
-				else
-					contrib.Type = DIC_UNKNOWN;
+	if(code && !initData && !uninitData)
+	  contrib.Type = DIC_CODE;
+	else if(!code && initData && !uninitData)
+	  contrib.Type = DIC_DATA;
+	else if(!code && !initData && uninitData)
+	  contrib.Type = DIC_BSS;
+	else
+	  contrib.Type = DIC_UNKNOWN;
 
-				BSTR objFileName = 0;
-				
-				IDiaSymbol *compiland = 0;
-				item->get_compiland(&compiland);
-				if(compiland)
-				{
-					compiland->get_name(&objFileName);
-					compiland->Release();
-				}
+	BSTR objFileName = 0;
+	
+	IDiaSymbol *compiland = 0;
+	item->get_compiland(&compiland);
+	if(compiland)
+	{
+	  compiland->get_name(&objFileName);
+	  compiland->Release();
+	}
 
-				sChar *objFileStr = BStrToString(objFileName,"<noobjfile>");
-				contrib.ObjFile = to.GetFileByName(objFileStr);
+	sChar *objFileStr = BStrToString(objFileName,"<noobjfile>");
+	contrib.ObjFile = to.GetFileByName(objFileStr);
 
-				delete[] objFileStr;
-				if(objFileName)
-					SysFreeString(objFileName);
+	delete[] objFileStr;
+	if(objFileName)
+	  SysFreeString(objFileName);
 
         item->Release();
       }
@@ -564,69 +566,71 @@ void PDBFileReader::ReadEverything(DebugInfo &to)
 
 sBool PDBFileReader::ReadDebugInfo(sChar *fileName,DebugInfo &to)
 {
-	static const struct DLLDesc
-	{
-		const char *Filename;
-		IID UseCLSID;
-	} DLLs[] = {
-		"msdia71.dll", __uuidof(DiaSource71),
-		"msdia80.dll", __uuidof(DiaSource80),
-		"msdia90.dll", __uuidof(DiaSource90),
-		// add more here as new versions appear (as long as they're backwards-compatible)
-		0
-	};
+  static const struct DLLDesc
+  {
+    const char *Filename;
+    IID UseCLSID;
+  } DLLs[] = {
+    "msdia71.dll", __uuidof(DiaSource71),
+    "msdia80.dll", __uuidof(DiaSource80),
+    "msdia90.dll", __uuidof(DiaSource90),
+    "msdia100.dll", __uuidof(DiaSource100), // VS 2010
+    "msdia110.dll", __uuidof(DiaSource110), // VS 2012
+    // add more here as new versions appear (as long as they're backwards-compatible)
+    0
+  };
 
   sBool readOk = false;
 
   if(FAILED(CoInitialize(0)))
-	{
-		fprintf(stderr, "  failed to initialize COM\n");
+  {
+    fprintf(stderr, "  failed to initialize COM\n");
     return false;
-	}
+  }
 
   IDiaDataSource *source = 0;
   HRESULT hr = E_FAIL;
 
-	// Try creating things "the official way"
-	for(sInt i=0;DLLs[i].Filename;i++)
-	{
-		hr = CoCreateInstance(DLLs[i].UseCLSID,0,CLSCTX_INPROC_SERVER,
-			__uuidof(IDiaDataSource),(void**) &source);
+  // Try creating things "the official way"
+  for(sInt i=0;DLLs[i].Filename;i++)
+  {
+    hr = CoCreateInstance(DLLs[i].UseCLSID,0,CLSCTX_INPROC_SERVER,
+      __uuidof(IDiaDataSource),(void**) &source);
 
-		if(SUCCEEDED(hr))
-			break;
-	}
+    if(SUCCEEDED(hr))
+      break;
+  }
 
   if(FAILED(hr))
   {
-		// None of the classes are registered, but most programmers will have the
-		// DLLs on their system anyway and can copy it over; try loading it directly.
+    // None of the classes are registered, but most programmers will have the
+    // DLLs on their system anyway and can copy it over; try loading it directly.
 
-		for(sInt i=0;DLLs[i].Filename;i++)
-		{
-			HMODULE hDIADll = LoadLibrary(DLLs[i].Filename);
-			if(hDIADll)
-			{
-				typedef HRESULT (__stdcall *PDllGetClassObject)(REFCLSID rclsid,REFIID riid,void** ppvObj);
-				PDllGetClassObject DllGetClassObject = (PDllGetClassObject) GetProcAddress(hDIADll,"DllGetClassObject");
-				if(DllGetClassObject)
-				{
-					// first create a class factory
+    for(sInt i=0;DLLs[i].Filename;i++)
+    {
+      HMODULE hDIADll = LoadLibrary(DLLs[i].Filename);
+      if(hDIADll)
+      {
+	typedef HRESULT (__stdcall *PDllGetClassObject)(REFCLSID rclsid,REFIID riid,void** ppvObj);
+	PDllGetClassObject DllGetClassObject = (PDllGetClassObject) GetProcAddress(hDIADll,"DllGetClassObject");
+	if(DllGetClassObject)
+	{
+	  // first create a class factory
           IClassFactory *classFactory;
-					hr = DllGetClassObject(DLLs[i].UseCLSID,IID_IClassFactory,(void**) &classFactory);
-					if(SUCCEEDED(hr))
-					{
-						hr = classFactory->CreateInstance(0,__uuidof(IDiaDataSource),(void**) &source);
-						classFactory->Release();
-					}
-				}
+	  hr = DllGetClassObject(DLLs[i].UseCLSID,IID_IClassFactory,(void**) &classFactory);
+	  if(SUCCEEDED(hr))
+	  {
+	    hr = classFactory->CreateInstance(0,__uuidof(IDiaDataSource),(void**) &source);
+	    classFactory->Release();
+	  }
+	}
 
-				if(SUCCEEDED(hr))
-					break;
-				else
-					FreeLibrary(hDIADll);
-			}
-		}
+	if(SUCCEEDED(hr))
+	  break;
+	else
+	  FreeLibrary(hDIADll);
+      }
+    }
   }
 
   if(source)
@@ -642,16 +646,16 @@ sBool PDBFileReader::ReadDebugInfo(sChar *fileName,DebugInfo &to)
         readOk = true;
         Session->Release();
       }
-			else
-				fprintf(stderr,"  failed to open DIA session\n");
+      else
+	fprintf(stderr,"  failed to open DIA session\n");
     }
-		else
-			fprintf(stderr,"  failed to load debug symbols (PDB not found)\n");
+    else
+      fprintf(stderr,"  failed to load debug symbols (PDB not found)\n");
 
     source->Release();
   }
-	else
-		fprintf(stderr,"  couldn't find (or properly initialize) any DIA dll, copying msdia*.dll to app dir might help.\n");
+  else
+    fprintf(stderr,"  couldn't find (or properly initialize) any DIA dll, copying msdia*.dll to app dir might help.\n");
 
   CoUninitialize();
 
