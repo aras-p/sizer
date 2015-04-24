@@ -354,7 +354,7 @@ static sChar *BStrToString( BSTR str, sChar *defString = "", bool stripWhitespac
   {
     sInt len = sGetStringLen(defString);
     sChar *buffer = new sChar[len+1];
-    sCopyString(buffer,defString,len+1);
+    sCopyString(buffer,sizeof(buffer),defString,len+1);
 
     return buffer;
   }
