@@ -305,6 +305,8 @@ class DECLSPEC_UUID("bce36434-2c24-499e-bf49-8bd99b0eeb68") DiaSource80;
 class DECLSPEC_UUID("4C41678E-887B-4365-A09E-925D28DB33C2") DiaSource90;
 class DECLSPEC_UUID("B86AE24D-BF2F-4ac9-B5A2-34B14E4CE11D") DiaSource100;
 class DECLSPEC_UUID("761D3BCD-1304-41D5-94E8-EAC54E4AC172") DiaSource110;
+class DECLSPEC_UUID("3bfcea48-620f-4b6b-81f7-b9af75454c7d") DiaSource120;
+class DECLSPEC_UUID("e6756135-1e65-4d17-8576-610761398c3c") DiaSource140;
 class DECLSPEC_UUID("79f1bb5f-b66e-48e5-b6a9-1545c323ca3d") IDiaDataSource;
 
 /****************************************************************************/
@@ -576,6 +578,8 @@ sBool PDBFileReader::ReadDebugInfo(sChar *fileName,DebugInfo &to)
     "msdia90.dll", __uuidof(DiaSource90),
     "msdia100.dll", __uuidof(DiaSource100), // VS 2010
     "msdia110.dll", __uuidof(DiaSource110), // VS 2012
+    "msdia120.dll", __uuidof(DiaSource120), // VS 2013
+    "msdia140.dll", __uuidof(DiaSource140), // VS 2015
     // add more here as new versions appear (as long as they're backwards-compatible)
     0
   };
