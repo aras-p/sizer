@@ -366,7 +366,7 @@ static sChar *BStrToString( BSTR str, sChar *defString = "", bool stripWhitespac
   sInt j = 0;
     for( sInt i=0;i<len;i++ )
   {
-    if( stripWhitespace && isspace(str[i]) )
+    if( stripWhitespace && iswspace(str[i]) )
       continue;
     buffer[j] = (str[i] >= 32 && str[i] < 128) ? str[i] : '?';
     ++j;
