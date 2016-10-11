@@ -217,7 +217,7 @@ sInt DebugInfo::GetNameSpaceByName(sChar *name)
   if(pp != name - 2)
   {
     sChar buffer[2048];
-    sCopyString(buffer,sizeof(buffer),name,2048);
+    sCopyString(buffer,sizeof(buffer),name,2048 - 1);
 
     if(pp - name < 2048)
       buffer[pp - name] = 0;
