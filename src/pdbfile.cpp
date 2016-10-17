@@ -354,7 +354,7 @@ static sChar *BStrToString( BSTR str, sChar *defString = "", bool stripWhitespac
   {
     sInt len = sGetStringLen(defString);
     sChar *buffer = new sChar[len+1];
-    sCopyString(buffer,sizeof(buffer),defString,len+1);
+    sCopyString(buffer,len+1,defString,len+1);
 
     return buffer;
   }
@@ -400,7 +400,7 @@ void PDBFileReader::ProcessSymbol(IDiaSymbol *symbol,DebugInfo &to)
   DWORD section,offset,rva;
   enum SymTagEnum tag;
   ULONGLONG length = 0;
-  BSTR name = 0, srcFileName = 0;
+  BSTR name = 0, undName = 0, srcFileName = 0;
 
   symbol->get_symTag((DWORD *) &tag);
   symbol->get_relativeVirtualAddress(&rva);
@@ -433,13 +433,16 @@ void PDBFileReader::ProcessSymbol(IDiaSymbol *symbol,DebugInfo &to)
   }
 
   symbol->get_name(&name);
+  symbol->get_undecoratedName(&undName);
 
   // fill out structure
-  sChar *nameStr = BStrToString( name, "<noname>", true);
+  sChar *nameStr = BStrToString(name, "<noname>", true);
+  sChar *undNameStr = BStrToString(undName, nameStr, false);
 
   to.Symbols.push_back( DISymbol() );
   DISymbol *outSym = &to.Symbols.back();
-  outSym->name = outSym->mangledName = to.MakeString(nameStr);
+  outSym->mangledName = to.MakeString(nameStr);
+  outSym->name = to.MakeString(undNameStr);
   outSym->objFileNum = objFile;
   outSym->VA = rva;
   outSym->Size = (sU32) length;
@@ -449,6 +452,7 @@ void PDBFileReader::ProcessSymbol(IDiaSymbol *symbol,DebugInfo &to)
   // clean up
   delete[] nameStr;
   if(name)         SysFreeString(name);
+  if(undName)      SysFreeString(undName);
 }
 
 void PDBFileReader::ReadEverything(DebugInfo &to)
