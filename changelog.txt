@@ -1,3 +1,7 @@
+0.1.7, 2017 02 13
+	briansmith: add support for VS2013 and VS2015 DIA SDKs
+	db4: undecorate C++ names in reports
+
 0.1.6, 2014 03 15
 	ryg: add support for VS2010 and VS2012 DIA SDKs
 
