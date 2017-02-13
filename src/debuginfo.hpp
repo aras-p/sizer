@@ -1,6 +1,7 @@
 // Executable size report utility.
 // Aras Pranckevicius, http://aras-p.info/projSizer.html
 // Based on code by Fabian "ryg" Giesen, http://farbrausch.com/~fg/
+// Public domain.
 
 #ifndef __DEBUGINFO_HPP__
 #define __DEBUGINFO_HPP__
