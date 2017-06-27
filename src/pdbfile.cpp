@@ -390,14 +390,6 @@ static sInt GetBStr(BSTR str,sChar *defString,DebugInfo &to)
 
 void PDBFileReader::ProcessSymbol(IDiaSymbol *symbol,DebugInfo &to)
 {
-  // print a dot for each 1000 symbols processed
-  static int counter = 0;
-  ++counter;
-  if( counter == 1000 ) {
-    fputc( '.', stderr );
-    counter = 0;
-  }
-
   DWORD section,offset,rva;
   enum SymTagEnum tag;
   ULONGLONG length = 0;
@@ -580,21 +572,29 @@ void PDBFileReader::ReadEverything(DebugInfo &to)
     IDiaEnumSymbols *enumSymbols;
     if (SUCCEEDED(globalSymbol->findChildren(SymTagCompiland, NULL, 0, &enumSymbols)))
     {
+        LONG compilandCount = 0;
+        enumSymbols->get_Count(&compilandCount);
+        if (compilandCount == 0)
+            compilandCount = 1;
+        LONG processedCount = 0;
         IDiaSymbol *compiland;
+        fprintf(stderr, "[      ]");
         while (SUCCEEDED(enumSymbols->Next(1, &compiland, &celt)) && (celt == 1))
         {
+            ++processedCount;
+            fprintf(stderr, "\b\b\b\b\b\b\b\b[%5.1f%%]", processedCount*100.0/compilandCount);
             // Find all the symbols defined in this compiland and treat their info
-            IDiaEnumSymbols *pEnumChildren;
-            if (SUCCEEDED(compiland->findChildren(SymTagNull, NULL, 0, &pEnumChildren)))
+            IDiaEnumSymbols *enumChildren;
+            if (SUCCEEDED(compiland->findChildren(SymTagNull, NULL, 0, &enumChildren)))
             {
                 IDiaSymbol *pSymbol;
                 ULONG celtChildren = 0;
-                while (SUCCEEDED(pEnumChildren->Next(1, &pSymbol, &celtChildren)) && (celtChildren == 1))
+                while (SUCCEEDED(enumChildren->Next(1, &pSymbol, &celtChildren)) && (celtChildren == 1))
                 {
                     ProcessSymbol(pSymbol, to);
                     pSymbol->Release();
                 }
-                pEnumChildren->Release();
+                enumChildren->Release();
             }
             compiland->Release();
         }

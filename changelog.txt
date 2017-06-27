@@ -1,5 +1,6 @@
 0.2, 2017 06 27
-	Massively speed up execution time for large & 64 bit binaries, by changing the symbol processing loop (Lionel Fuentes).
+	Massively speed up execution time for large & 64 bit binaries, by changing the symbol processing loop (Lionel Fuentes)
+	Improved progress reporting; percentage printed now (aras)
 
 0.1.7, 2017 02 13
 	Add support for VS2013 and VS2015 DIA SDKs (Brian Smith)
@@ -16,8 +17,8 @@
 	Add support for reading vs2008 generated pdb's (lucas)
 
 0.1.3, 2008 01 17
-	Fixed a crash on some executables; IDiaSymbol2::get_type may return S_ERROR. (aras; reported by Ivan-Assen Ivanov).
-	Print a dot for each 1000 symbols read. Some executables spend ages inside DIA dlls.
+	Fixed a crash on some executables; IDiaSymbol2::get_type may return S_ERROR (aras; reported by Ivan-Assen Ivanov)
+	Print a dot for each 1000 symbols read. Some executables spend ages inside DIA dlls
 	
 0.1.2, 2008 01 14
 	Added support for VC8.0 DIA DLL (ryg)
