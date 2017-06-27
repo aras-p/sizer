@@ -131,7 +131,7 @@ class IDiaSession : public IUnknown
 public:
   virtual HRESULT __stdcall get_loadAddress(ULONGLONG *ret) = 0;
   virtual HRESULT __stdcall put_loadAddress(ULONGLONG val) = 0;
-  virtual HRESULT __stdcall get_globalScape(IDiaSymbol **sym) = 0;
+  virtual HRESULT __stdcall get_globalScope(IDiaSymbol **sym) = 0;
 
   virtual HRESULT __stdcall getEnumTables(IDiaEnumTables** ppEnumTables) = 0;
   virtual HRESULT __stdcall getSymbolsByAddr(IDiaEnumSymbolsByAddr** ppEnumbyAddr) = 0;
@@ -531,6 +531,10 @@ void PDBFileReader::ReadEverything(DebugInfo &to)
     enumTables->Release();
   }
 
+  /*
+  // Note: this was the original code; that was however extremely slow especially on larger or 64 bit binaries.
+  // New code that replaces it (however it does not produce 100% identical results) is below.
+
   // enumerate symbols by (virtual) address
   IDiaEnumSymbolsByAddr *enumByAddr;
   if(SUCCEEDED(Session->getSymbolsByAddr(&enumByAddr)))
@@ -563,6 +567,40 @@ void PDBFileReader::ReadEverything(DebugInfo &to)
     }
 
     enumByAddr->Release();
+  }
+  */
+
+  // This is new code that replaces commented out code above. On one not-too-big executable this gets Sizer execution time from
+  // 448 seconds down to 1.5 seconds. However it does not list some symbols that are "weird" and are likely due to linker padding
+  // or somesuch; I did not dig in. On that particular executable, e.g. 128 kb that is coming from "* Linker *" file is gone.
+  IDiaSymbol* globalSymbol = NULL;
+  if (SUCCEEDED(Session->get_globalScope(&globalSymbol)))
+  {
+    // Retrieve the compilands first
+    IDiaEnumSymbols *enumSymbols;
+    if (SUCCEEDED(globalSymbol->findChildren(SymTagCompiland, NULL, 0, &enumSymbols)))
+    {
+        IDiaSymbol *compiland;
+        while (SUCCEEDED(enumSymbols->Next(1, &compiland, &celt)) && (celt == 1))
+        {
+            // Find all the symbols defined in this compiland and treat their info
+            IDiaEnumSymbols *pEnumChildren;
+            if (SUCCEEDED(compiland->findChildren(SymTagNull, NULL, 0, &pEnumChildren)))
+            {
+                IDiaSymbol *pSymbol;
+                ULONG celtChildren = 0;
+                while (SUCCEEDED(pEnumChildren->Next(1, &pSymbol, &celtChildren)) && (celtChildren == 1))
+                {
+                    ProcessSymbol(pSymbol, to);
+                    pSymbol->Release();
+                }
+                pEnumChildren->Release();
+            }
+            compiland->Release();
+        }
+        enumSymbols->Release();
+    }
+    globalSymbol->Release();
   }
 
   // clean up
