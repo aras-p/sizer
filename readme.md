@@ -10,4 +10,5 @@ Other similar tools:
 * [SymbolSort](https://github.com/adrianstone55/SymbolSort) for Win32/PDB binaries.
 * [Bloaty McBloatface](https://github.com/google/bloaty) for ELF/Mach-O binaries.
 
-License is public domain.
+License is public domain. Source contains CC0-licensed [parg](https://github.com/jibsen/parg)
+command line parser.
