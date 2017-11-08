@@ -52,6 +52,22 @@ struct TemplateSymbol
     sU32 count;
 };
 
+struct DebugFilters
+{
+    DebugFilters() : minFunction(512), minData(1024), minClass(2048), minFile(2048), minTemplate(512), minTemplateCount(3) { }
+    void SetMinSize(int m)
+    {
+        minFunction = minData = minClass = minFile = minTemplate = m;
+    }
+    std::string name;
+    int minFunction;
+    int minData;
+    int minClass;
+    int minFile;
+    int minTemplate;
+    int minTemplateCount;
+};
+
 class DebugInfo
 {
     typedef std::vector<string>   StringByIndexVector;
@@ -89,13 +105,13 @@ public:
     void FinishAnalyze();
     sBool FindSymbol(sU32 VA, DISymbol **sym);
 
-    std::string WriteReport();
+    std::string WriteReport(const DebugFilters& filters);
 };
 
 class DebugInfoReader
 {
 public:
-    virtual sBool ReadDebugInfo(sChar *fileName, DebugInfo &to) = 0;
+    virtual sBool ReadDebugInfo(const sChar *fileName, DebugInfo &to) = 0;
 };
 
 

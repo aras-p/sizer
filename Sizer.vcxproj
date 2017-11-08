@@ -93,10 +93,12 @@
   <ItemGroup>
     <ClCompile Include="src\debuginfo.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\parg.c" />
     <ClCompile Include="src\pdbfile.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\debuginfo.hpp" />
+    <ClInclude Include="src\parg.h" />
     <ClInclude Include="src\pdbfile.hpp" />
     <ClInclude Include="src\types.hpp" />
   </ItemGroup>

@@ -15,6 +15,9 @@
     <ClCompile Include="src\pdbfile.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\parg.c">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\debuginfo.hpp">
@@ -24,6 +27,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\types.hpp">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\parg.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

@@ -611,7 +611,7 @@ void PDBFileReader::ReadEverything(DebugInfo &to)
 
 /****************************************************************************/
 
-sBool PDBFileReader::ReadDebugInfo(sChar *fileName, DebugInfo &to)
+sBool PDBFileReader::ReadDebugInfo(const sChar *fileName, DebugInfo &to)
 {
     static const struct DLLDesc
     {

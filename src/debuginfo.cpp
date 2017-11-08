@@ -326,74 +326,91 @@ static void sAppendPrintF(std::string &str, const char *format, ...)
     str += buffer;
 }
 
-std::string DebugInfo::WriteReport()
+std::string DebugInfo::WriteReport(const DebugFilters& filters)
 {
-    const int kMinSymbolSize = 512;
-    const int kMinTemplateSize = 512;
-    const int kMinTemplateCount = 3;
-    const int kMinDataSize = 1024;
-    const int kMinClassSize = 2048;
-    const int kMinFileSize = 2048;
-
     std::string Report;
     sInt i; //,j;
     sU32 size;
+    const char* filterName = filters.name.empty() ? NULL : filters.name.c_str();
 
     Report.reserve(16384); // start out with 16k space
+    if (filterName)
+    {
+        sAppendPrintF(Report, "Only including things with '%s' in their name/file\n\n", filterName);
+    }
 
     // symbols
-    sAppendPrintF(Report, "Functions by size (kilobytes):\n");
+    sAppendPrintF(Report, "Functions by size (kilobytes, min %.2f):\n", filters.minFunction/1024.0);
     std::sort(Symbols.begin(), Symbols.end(), symSizeComp);
 
     for (i = 0; i < Symbols.size(); i++)
     {
-        if (Symbols[i].Size < kMinSymbolSize)
+        if (Symbols[i].Size < filters.minFunction)
             break;
         if (Symbols[i].Class == DIC_CODE)
+        {
+            const char* name1 = GetStringPrep(Symbols[i].mangledName);
+            const char* name2 = GetStringPrep(m_Files[Symbols[i].objFileNum].fileName);
+            const char* name3 = GetStringPrep(Symbols[i].name);
+            if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName) && !strstr(name3, filterName))
+                continue;
             sAppendPrintF(Report, "%5d.%02d: %-80s %-40s %s\n",
                 Symbols[i].Size / 1024, (Symbols[i].Size % 1024) * 100 / 1024,
-                GetStringPrep(Symbols[i].mangledName), GetStringPrep(m_Files[Symbols[i].objFileNum].fileName), GetStringPrep(Symbols[i].name));
+                name1, name2, name3);
+        }
     }
 
     // templates
-    sAppendPrintF(Report, "\nAggregated templates by size (kilobytes):\n");
+    sAppendPrintF(Report, "\nAggregated templates by size (kilobytes, min %.2f / %i):\n", filters.minTemplate/1024.0, filters.minTemplateCount);
 
     std::sort(Templates.begin(), Templates.end(), templateSizeComp);
 
     for (i = 0; i < Templates.size(); i++)
     {
-        if (Templates[i].size < kMinTemplateSize || Templates[i].count < kMinTemplateCount)
+        if (Templates[i].size < filters.minTemplate || Templates[i].count < filters.minTemplateCount)
             break;
+        const char* name1 = Templates[i].mangledName.c_str();
+        const char* name2 = Templates[i].name.c_str();
+        if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
+            continue;
         sAppendPrintF(Report, "%5d.%02d #%5d: %-80s %s\n",
             Templates[i].size / 1024, (Templates[i].size % 1024) * 100 / 1024,
             Templates[i].count,
-            Templates[i].mangledName.c_str(),
-            Templates[i].name.c_str());
+            name1,
+            name2);
     }
 
-    sAppendPrintF(Report, "\nData by size (kilobytes):\n");
+    sAppendPrintF(Report, "\nData by size (kilobytes, min %.2f):\n", filters.minData/1024.0);
     for (i = 0; i < Symbols.size(); i++)
     {
-        if (Symbols[i].Size < kMinDataSize)
+        if (Symbols[i].Size < filters.minData)
             break;
         if (Symbols[i].Class == DIC_DATA)
         {
+            const char* name1 = GetStringPrep(Symbols[i].name);
+            const char* name2 = GetStringPrep(m_Files[Symbols[i].objFileNum].fileName);
+            if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
+                continue;
             sAppendPrintF(Report, "%5d.%02d: %-50s %s\n",
                 Symbols[i].Size / 1024, (Symbols[i].Size % 1024) * 100 / 1024,
-                GetStringPrep(Symbols[i].name), GetStringPrep(m_Files[Symbols[i].objFileNum].fileName));
+                name1, name2);
         }
     }
 
-    sAppendPrintF(Report, "\nBSS by size (kilobytes):\n");
+    sAppendPrintF(Report, "\nBSS by size (kilobytes, min %.2f):\n", filters.minData/1024.0);
     for (i = 0; i < Symbols.size(); i++)
     {
-        if (Symbols[i].Size < kMinDataSize)
+        if (Symbols[i].Size < filters.minData)
             break;
         if (Symbols[i].Class == DIC_BSS)
         {
+            const char* name1 = GetStringPrep(Symbols[i].name);
+            const char* name2 = GetStringPrep(m_Files[Symbols[i].objFileNum].fileName);
+            if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
+                continue;
             sAppendPrintF(Report, "%5d.%02d: %-50s %s\n",
                 Symbols[i].Size / 1024, (Symbols[i].Size % 1024) * 100 / 1024,
-                GetStringPrep(Symbols[i].name), GetStringPrep(m_Files[Symbols[i].objFileNum].fileName));
+                name1, name2);
         }
     }
 
@@ -424,26 +441,32 @@ std::string DebugInfo::WriteReport()
     }
     */
 
-    sAppendPrintF(Report, "\nClasses/Namespaces by code size (kilobytes):\n");
+    sAppendPrintF(Report, "\nClasses/Namespaces by code size (kilobytes, min %.2f):\n", filters.minClass/1024.0);
     std::sort(NameSps.begin(), NameSps.end(), nameCodeSizeComp);
 
     for (i = 0; i < NameSps.size(); i++)
     {
-        if (NameSps[i].codeSize < kMinClassSize)
+        if (NameSps[i].codeSize < filters.minClass)
             break;
+        const char* name1 = GetStringPrep(NameSps[i].name);
+        if (filterName && !strstr(name1, filterName))
+            continue;
         sAppendPrintF(Report, "%5d.%02d: %s\n",
-            NameSps[i].codeSize / 1024, (NameSps[i].codeSize % 1024) * 100 / 1024, GetStringPrep(NameSps[i].name));
+            NameSps[i].codeSize / 1024, (NameSps[i].codeSize % 1024) * 100 / 1024, name1);
     }
 
-    sAppendPrintF(Report, "\nObject files by code size (kilobytes):\n");
+    sAppendPrintF(Report, "\nObject files by code size (kilobytes, min %.2f):\n", filters.minFile/1024.0);
     std::sort(m_Files.begin(), m_Files.end(), fileCodeSizeComp);
 
     for (i = 0; i < m_Files.size(); i++)
     {
-        if (m_Files[i].codeSize < kMinFileSize)
+        if (m_Files[i].codeSize < filters.minFile)
             break;
+        const char* name1 = GetStringPrep(m_Files[i].fileName);
+        if (filterName && !strstr(name1, filterName))
+            continue;
         sAppendPrintF(Report, "%5d.%02d: %s\n", m_Files[i].codeSize / 1024,
-            (m_Files[i].codeSize % 1024) * 100 / 1024, GetStringPrep(m_Files[i].fileName));
+            (m_Files[i].codeSize % 1024) * 100 / 1024, name1);
     }
 
     size = CountSizeInClass(DIC_CODE);

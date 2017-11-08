@@ -26,7 +26,7 @@ class PDBFileReader : public DebugInfoReader
     void ReadEverything(DebugInfo &to);
 
 public:
-    sBool ReadDebugInfo(sChar *fileName, DebugInfo &to);
+    sBool ReadDebugInfo(const sChar *fileName, DebugInfo &to);
 };
 
 /****************************************************************************/
