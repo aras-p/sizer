@@ -320,7 +320,7 @@ static void sAppendPrintF(std::string &str, const char *format, ...)
     _vsnprintf(buffer, bufferSize - 1, format, arg);
     va_end(arg);
 
-    strcpy(&buffer[bufferSize - 4], "...");
+    strcpy(&buffer[bufferSize - 5], "...\n");
     str += buffer;
 }
 
