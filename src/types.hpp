@@ -22,11 +22,12 @@ typedef bool sBool;
 
 #define sArray std::vector
 
-inline void sCopyString( sChar* a, size_t a_len, const sChar* b, int b_len )
+inline void sCopyString(sChar* a, size_t a_len, const sChar* b, int b_len)
 {
-	if (strncpy_s( a, a_len, b, b_len ) != 0) {
-		abort();
-	}
+    if (strncpy_s(a, a_len, b, b_len) != 0)
+    {
+        abort();
+    }
 }
 
 #define sCopyMem memcpy

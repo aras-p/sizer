@@ -14,19 +14,19 @@ class IDiaSession;
 
 class PDBFileReader : public DebugInfoReader
 {
-  struct SectionContrib;
+    struct SectionContrib;
 
-  SectionContrib *Contribs;
-  sInt nContribs;
+    SectionContrib *Contribs;
+    sInt nContribs;
 
-  IDiaSession *Session;
+    IDiaSession *Session;
 
-  const SectionContrib *ContribFromSectionOffset(sU32 section,sU32 offset);
-  void ProcessSymbol(class IDiaSymbol *symbol,DebugInfo &to);
-  void ReadEverything(DebugInfo &to);
+    const SectionContrib *ContribFromSectionOffset(sU32 section, sU32 offset);
+    void ProcessSymbol(class IDiaSymbol *symbol, DebugInfo &to);
+    void ReadEverything(DebugInfo &to);
 
 public:
-  sBool ReadDebugInfo(sChar *fileName,DebugInfo &to);
+    sBool ReadDebugInfo(sChar *fileName, DebugInfo &to);
 };
 
 /****************************************************************************/
