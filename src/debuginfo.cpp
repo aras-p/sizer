@@ -109,6 +109,8 @@ void DebugInfo::FinishedReading()
                 templateToIndex.insert(std::make_pair(templateName, index));
                 TemplateSymbol tsym;
                 tsym.name = templateName;
+                tsym.mangledName = GetStringPrep(sym->mangledName);
+                StripTemplateParams(tsym.mangledName);
                 tsym.count = 1;
                 tsym.size = sym->Size;
                 Templates.push_back(tsym);
@@ -328,6 +330,7 @@ std::string DebugInfo::WriteReport()
 {
     const int kMinSymbolSize = 512;
     const int kMinTemplateSize = 512;
+    const int kMinTemplateCount = 3;
     const int kMinDataSize = 1024;
     const int kMinClassSize = 2048;
     const int kMinFileSize = 2048;
@@ -347,9 +350,9 @@ std::string DebugInfo::WriteReport()
         if (Symbols[i].Size < kMinSymbolSize)
             break;
         if (Symbols[i].Class == DIC_CODE)
-            sAppendPrintF(Report, "%5d.%02d: %-50s %s\n",
+            sAppendPrintF(Report, "%5d.%02d: %-80s %-40s %s\n",
                 Symbols[i].Size / 1024, (Symbols[i].Size % 1024) * 100 / 1024,
-                GetStringPrep(Symbols[i].name), GetStringPrep(m_Files[Symbols[i].objFileNum].fileName));
+                GetStringPrep(Symbols[i].mangledName), GetStringPrep(m_Files[Symbols[i].objFileNum].fileName), GetStringPrep(Symbols[i].name));
     }
 
     // templates
@@ -359,11 +362,12 @@ std::string DebugInfo::WriteReport()
 
     for (i = 0; i < Templates.size(); i++)
     {
-        if (Templates[i].size < kMinTemplateSize)
+        if (Templates[i].size < kMinTemplateSize || Templates[i].count < kMinTemplateCount)
             break;
-        sAppendPrintF(Report, "%5d.%02d #%5d: %s\n",
+        sAppendPrintF(Report, "%5d.%02d #%5d: %-80s %s\n",
             Templates[i].size / 1024, (Templates[i].size % 1024) * 100 / 1024,
             Templates[i].count,
+            Templates[i].mangledName.c_str(),
             Templates[i].name.c_str());
     }
 
@@ -443,15 +447,19 @@ std::string DebugInfo::WriteReport()
     }
 
     size = CountSizeInClass(DIC_CODE);
-    sAppendPrintF(Report, "\nOverall code: %5d.%02d kb\n", size / 1024,
+    sAppendPrintF(Report, "\nOverall code:  %5d.%02d kb\n", size / 1024,
         (size % 1024) * 100 / 1024);
 
     size = CountSizeInClass(DIC_DATA);
-    sAppendPrintF(Report, "Overall data: %5d.%02d kb\n", size / 1024,
+    sAppendPrintF(Report, "Overall data:  %5d.%02d kb\n", size / 1024,
         (size % 1024) * 100 / 1024);
 
     size = CountSizeInClass(DIC_BSS);
-    sAppendPrintF(Report, "Overall BSS:  %5d.%02d kb\n", size / 1024,
+    sAppendPrintF(Report, "Overall BSS:   %5d.%02d kb\n", size / 1024,
+        (size % 1024) * 100 / 1024);
+
+    size = CountSizeInClass(DIC_UNKNOWN);
+    sAppendPrintF(Report, "Overall other: %5d.%02d kb\n", size / 1024,
         (size % 1024) * 100 / 1024);
 
     return Report;

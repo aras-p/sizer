@@ -46,9 +46,10 @@ struct DISymbol
 
 struct TemplateSymbol
 {
-    string  name;
-    sU32  size;
-    sU32  count;
+    std::string name;
+    std::string mangledName;
+    sU32 size;
+    sU32 count;
 };
 
 class DebugInfo
