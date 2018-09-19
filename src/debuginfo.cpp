@@ -367,8 +367,10 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
 
     for (i = 0; i < Templates.size(); i++)
     {
-        if (Templates[i].size < filters.minTemplate || Templates[i].count < filters.minTemplateCount)
+        if (Templates[i].size < filters.minTemplate)
             break;
+        if (Templates[i].count < filters.minTemplateCount)
+            continue;
         const char* name1 = Templates[i].mangledName.c_str();
         const char* name2 = Templates[i].name.c_str();
         if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
