@@ -4,6 +4,9 @@
     <Filter Include="src">
       <UniqueIdentifier>{bbd26fb8-fdc8-4995-a8db-0e7a73db789e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\raw_pdb">
+      <UniqueIdentifier>{67f8a9c9-048a-41e5-abf8-3ff10b73d784}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\debuginfo.cpp">
@@ -18,6 +21,66 @@
     <ClCompile Include="src\parg.c">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_CoalescedMSFStream.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_DBIStream.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_DBITypes.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_DirectMSFStream.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_GlobalSymbolStream.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_ImageSectionStream.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_InfoStream.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_IPIStream.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_ModuleInfoStream.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_ModuleLineStream.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_ModuleSymbolStream.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_NamesStream.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_PCH.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_PublicSymbolStream.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_RawFile.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_SectionContributionStream.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_SourceFileStream.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_TPIStream.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raw_pdb\PDB_Types.cpp">
+      <Filter>src\raw_pdb</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\debuginfo.hpp">
@@ -31,6 +94,78 @@
     </ClInclude>
     <ClInclude Include="src\parg.h">
       <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_CoalescedMSFStream.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_DBIStream.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_DBITypes.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_DirectMSFStream.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_ErrorCodes.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_GlobalSymbolStream.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_ImageSectionStream.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_InfoStream.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_IPIStream.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_IPITypes.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_ModuleInfoStream.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_ModuleLineStream.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_ModuleSymbolStream.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_NamesStream.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_PCH.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_PublicSymbolStream.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_RawFile.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_SectionContributionStream.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_SourceFileStream.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_TPIStream.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_TPITypes.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_Types.h">
+      <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raw_pdb\PDB_Util.h">
+      <Filter>src\raw_pdb</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
