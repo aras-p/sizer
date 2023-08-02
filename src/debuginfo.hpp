@@ -21,35 +21,35 @@ using std::string;
 
 struct DISymFile // File
 {
-    sInt  fileName;
-    sU32  codeSize;
-    sU32  dataSize;
+    int32_t  fileName;
+    uint32_t  codeSize;
+    uint32_t  dataSize;
 };
 
 struct DISymNameSp // Namespace
 {
-    sInt  name;
-    sU32  codeSize;
-    sU32  dataSize;
+    int32_t  name;
+    uint32_t  codeSize;
+    uint32_t  dataSize;
 };
 
 struct DISymbol
 {
-    sInt name;
-    sInt mangledName;
-    sInt NameSpNum;
-    sInt objFileNum;
-    sU32 VA;
-    sU32 Size;
-    sInt Class;
+    int32_t name;
+    int32_t mangledName;
+    int32_t NameSpNum;
+    int32_t objFileNum;
+    uint32_t VA;
+    uint32_t Size;
+    int32_t Class;
 };
 
 struct TemplateSymbol
 {
     std::string name;
     std::string mangledName;
-    sU32 size;
-    sU32 count;
+    uint32_t size;
+    uint32_t count;
 };
 
 struct DebugFilters
@@ -71,39 +71,34 @@ struct DebugFilters
 class DebugInfo
 {
     typedef std::vector<string>   StringByIndexVector;
-    typedef std::map<string, sInt> IndexByStringMap;
+    typedef std::map<string, int32_t> IndexByStringMap;
 
     StringByIndexVector m_StringByIndex;
     IndexByStringMap  m_IndexByString;
-    sU32 BaseAddress;
 
-    sU32 CountSizeInClass(sInt type) const;
+    uint32_t CountSizeInClass(int32_t type) const;
 
 public:
-    sArray<DISymbol>  Symbols;
-    sArray<TemplateSymbol>  Templates;
-    sArray<DISymFile> m_Files;
-    sArray<DISymNameSp> NameSps;
-
-    void Init();
-    void Exit();
+    std::vector<DISymbol>  Symbols;
+    std::vector<TemplateSymbol>  Templates;
+    std::vector<DISymFile> m_Files;
+    std::vector<DISymNameSp> NameSps;
 
     // only use those before reading is finished!!
-    sInt MakeString(sChar *s);
-    const char* GetStringPrep(sInt index) const { return m_StringByIndex[index].c_str(); }
-    void SetBaseAddress(sU32 base)            { BaseAddress = base; }
+    int32_t MakeString(char *s);
+    const char* GetStringPrep(int32_t index) const { return m_StringByIndex[index].c_str(); }
 
     void FinishedReading();
 
-    sInt GetFile(sInt fileName);
-    sInt GetFileByName(sChar *objName);
+    int32_t GetFile(int32_t fileName);
+    int32_t GetFileByName(char *objName);
 
-    sInt GetNameSpace(sInt name);
-    sInt GetNameSpaceByName(sChar *name);
+    int32_t GetNameSpace(int32_t name);
+    int32_t GetNameSpaceByName(char *name);
 
     void StartAnalyze();
     void FinishAnalyze();
-    sBool FindSymbol(sU32 VA, DISymbol **sym);
+    bool FindSymbol(uint32_t VA, DISymbol **sym);
 
     std::string WriteReport(const DebugFilters& filters);
 };
@@ -111,7 +106,7 @@ public:
 class DebugInfoReader
 {
 public:
-    virtual sBool ReadDebugInfo(const sChar *fileName, DebugInfo &to) = 0;
+    virtual bool ReadDebugInfo(const char *fileName, DebugInfo &to) = 0;
 };
 
 

@@ -91,7 +91,6 @@ int main(int argc, char * const * argv)
 
     clock_t time1 = clock();
 
-    info.Init();
     PDBFileReader pdb;
     fprintf(stderr, "Reading debug info for %s ...\n", file.c_str());
     bool pdbok = pdb.ReadDebugInfo(file.c_str(), info);

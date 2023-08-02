@@ -17,16 +17,16 @@ class PDBFileReader : public DebugInfoReader
     struct SectionContrib;
 
     SectionContrib *Contribs;
-    sInt nContribs;
+    int32_t nContribs;
 
     IDiaSession *Session;
 
-    const SectionContrib *ContribFromSectionOffset(sU32 section, sU32 offset);
+    const SectionContrib *ContribFromSectionOffset(uint32_t section, uint32_t offset);
     void ProcessSymbol(class IDiaSymbol *symbol, DebugInfo &to);
     void ReadEverything(DebugInfo &to);
 
 public:
-    sBool ReadDebugInfo(const sChar *fileName, DebugInfo &to);
+    bool ReadDebugInfo(const char *fileName, DebugInfo &to);
 };
 
 /****************************************************************************/

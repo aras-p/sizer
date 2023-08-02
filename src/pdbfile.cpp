@@ -318,13 +318,13 @@ struct PDBFileReader::SectionContrib
     DWORD Offset;
     DWORD Length;
     DWORD Compiland;
-    sInt Type;
-    sInt ObjFile;
+    int32_t Type;
+    int32_t ObjFile;
 };
 
-const PDBFileReader::SectionContrib *PDBFileReader::ContribFromSectionOffset(sU32 sec, sU32 offs)
+const PDBFileReader::SectionContrib *PDBFileReader::ContribFromSectionOffset(uint32_t sec, uint32_t offs)
 {
-    sInt l, r, x;
+    int32_t l, r, x;
 
     l = 0;
     r = nContribs;
@@ -349,23 +349,23 @@ const PDBFileReader::SectionContrib *PDBFileReader::ContribFromSectionOffset(sU3
 }
 
 // helpers
-static sChar *BStrToString(BSTR str, sChar *defString = "", bool stripWhitespace = false)
+static char *BStrToString(BSTR str, char *defString = "", bool stripWhitespace = false)
 {
     if (!str)
     {
-        sInt len = sGetStringLen(defString);
-        sChar *buffer = new sChar[len + 1];
+        int32_t len = strlen(defString);
+        char *buffer = new char[len + 1];
         sCopyString(buffer, len + 1, defString, len + 1);
 
         return buffer;
     }
     else
     {
-        sInt len = SysStringLen(str);
-        sChar *buffer = new sChar[len + 1];
+        int32_t len = SysStringLen(str);
+        char *buffer = new char[len + 1];
 
-        sInt j = 0;
-        for (sInt i = 0; i < len; i++)
+        int32_t j = 0;
+        for (int32_t i = 0; i < len; i++)
         {
             if (stripWhitespace && iswspace(str[i]))
                 continue;
@@ -379,10 +379,10 @@ static sChar *BStrToString(BSTR str, sChar *defString = "", bool stripWhitespace
     }
 }
 
-static sInt GetBStr(BSTR str, sChar *defString, DebugInfo &to)
+static int32_t GetBStr(BSTR str, char *defString, DebugInfo &to)
 {
-    sChar *normalStr = BStrToString(str);
-    sInt result = to.MakeString(normalStr);
+    char *normalStr = BStrToString(str);
+    int32_t result = to.MakeString(normalStr);
     delete[] normalStr;
 
     return result;
@@ -416,8 +416,8 @@ void PDBFileReader::ProcessSymbol(IDiaSymbol *symbol, DebugInfo &to)
     }
 
     const SectionContrib *contrib = ContribFromSectionOffset(section, offset);
-    sInt objFile = 0;
-    sInt sectionType = DIC_UNKNOWN;
+    int32_t objFile = 0;
+    int32_t sectionType = DIC_UNKNOWN;
 
     if (contrib)
     {
@@ -429,8 +429,8 @@ void PDBFileReader::ProcessSymbol(IDiaSymbol *symbol, DebugInfo &to)
     symbol->get_undecoratedName(&undName);
 
     // fill out structure
-    sChar *nameStr = BStrToString(name, "<noname>", true);
-    sChar *undNameStr = BStrToString(undName, nameStr, false);
+    char *nameStr = BStrToString(name, "<noname>", true);
+    char *undNameStr = BStrToString(undName, nameStr, false);
 
     to.Symbols.push_back(DISymbol());
     DISymbol *outSym = &to.Symbols.back();
@@ -438,7 +438,7 @@ void PDBFileReader::ProcessSymbol(IDiaSymbol *symbol, DebugInfo &to)
     outSym->name = to.MakeString(undNameStr);
     outSym->objFileNum = objFile;
     outSym->VA = rva;
-    outSym->Size = (sU32)length;
+    outSym->Size = (uint32_t)length;
     outSym->Class = sectionType;
     outSym->NameSpNum = to.GetNameSpaceByName(nameStr);
 
@@ -508,7 +508,7 @@ void PDBFileReader::ReadEverything(DebugInfo &to)
                     compiland->Release();
                 }
 
-                sChar *objFileStr = BStrToString(objFileName, "<noobjfile>");
+                char *objFileStr = BStrToString(objFileName, "<noobjfile>");
                 contrib.ObjFile = to.GetFileByName(objFileStr);
 
                 delete[] objFileStr;
@@ -611,7 +611,7 @@ void PDBFileReader::ReadEverything(DebugInfo &to)
 
 /****************************************************************************/
 
-sBool PDBFileReader::ReadDebugInfo(const sChar *fileName, DebugInfo &to)
+bool PDBFileReader::ReadDebugInfo(const char *fileName, DebugInfo &to)
 {
     static const struct DLLDesc
     {
@@ -630,7 +630,7 @@ sBool PDBFileReader::ReadDebugInfo(const sChar *fileName, DebugInfo &to)
         0
     };
 
-    sBool readOk = false;
+    bool readOk = false;
 
     if (FAILED(CoInitialize(0)))
     {
@@ -642,7 +642,7 @@ sBool PDBFileReader::ReadDebugInfo(const sChar *fileName, DebugInfo &to)
     HRESULT hr = E_FAIL;
 
     // Try creating things "the official way"
-    for (sInt i = 0; DLLs[i].Filename; i++)
+    for (int32_t i = 0; DLLs[i].Filename; i++)
     {
         hr = CoCreateInstance(DLLs[i].UseCLSID, 0, CLSCTX_INPROC_SERVER,
                 __uuidof(IDiaDataSource), (void**)&source);
@@ -656,7 +656,7 @@ sBool PDBFileReader::ReadDebugInfo(const sChar *fileName, DebugInfo &to)
         // None of the classes are registered, but most programmers will have the
         // DLLs on their system anyway and can copy it over; try loading it directly.
 
-        for (sInt i = 0; DLLs[i].Filename; i++)
+        for (int32_t i = 0; DLLs[i].Filename; i++)
         {
             HMODULE hDIADll = LoadLibrary(DLLs[i].Filename);
             if (hDIADll)

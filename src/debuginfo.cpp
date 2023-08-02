@@ -11,32 +11,23 @@
 
 /****************************************************************************/
 
-sU32 DebugInfo::CountSizeInClass(sInt type) const
+uint32_t DebugInfo::CountSizeInClass(int32_t type) const
 {
-    sU32 size = 0;
-    for (sInt i = 0; i < Symbols.size(); i++)
+    uint32_t size = 0;
+    for (int32_t i = 0; i < Symbols.size(); i++)
         size += (Symbols[i].Class == type) ? Symbols[i].Size : 0;
 
     return size;
 }
 
-void DebugInfo::Init()
-{
-    BaseAddress = 0;
-}
-
-void DebugInfo::Exit()
-{
-}
-
-sInt DebugInfo::MakeString(sChar *s)
+int32_t DebugInfo::MakeString(char *s)
 {
     string str(s);
     IndexByStringMap::iterator it = m_IndexByString.find(str);
     if (it != m_IndexByString.end())
         return it->second;
 
-    sInt index = m_IndexByString.size();
+    int32_t index = m_IndexByString.size();
     m_IndexByString.insert(std::make_pair(str, index));
     m_StringByIndex.push_back(str);
     return index;
@@ -87,7 +78,7 @@ void DebugInfo::FinishedReading()
     typedef std::map<std::string, int> StringIntMap;
     StringIntMap templateToIndex;
 
-    for (sInt i = 0; i < Symbols.size(); i++)
+    for (int32_t i = 0; i < Symbols.size(); i++)
     {
         DISymbol *sym = &Symbols[i];
 
@@ -122,23 +113,23 @@ void DebugInfo::FinishedReading()
     std::sort(Symbols.begin(), Symbols.end(), virtAddressComp);
 
     // remove address double-covers
-    sInt symCount = Symbols.size();
+    int32_t symCount = Symbols.size();
     DISymbol *syms = new DISymbol[symCount];
-    sCopyMem(syms, &Symbols[0], symCount * sizeof(DISymbol));
+    memcpy(syms, &Symbols[0], symCount * sizeof(DISymbol));
 
     Symbols.clear();
-    sU32 oldVA = 0;
-    sInt oldSize = 0;
+    uint32_t oldVA = 0;
+    int32_t oldSize = 0;
 
-    for (sInt i = 0; i < symCount; i++)
+    for (int32_t i = 0; i < symCount; i++)
     {
         DISymbol *in = &syms[i];
-        sU32 newVA = in->VA;
-        sU32 newSize = in->Size;
+        uint32_t newVA = in->VA;
+        uint32_t newSize = in->Size;
 
         if (oldVA != 0)
         {
-            sInt adjust = newVA - oldVA;
+            int32_t adjust = newVA - oldVA;
             if (adjust < 0) // we have to shorten
             {
                 newVA = oldVA;
@@ -163,9 +154,9 @@ void DebugInfo::FinishedReading()
     delete[] syms;
 }
 
-sInt DebugInfo::GetFile(sInt fileName)
+int32_t DebugInfo::GetFile(int32_t fileName)
 {
-    for (sInt i = 0; i < m_Files.size(); i++)
+    for (int32_t i = 0; i < m_Files.size(); i++)
         if (m_Files[i].fileName == fileName)
             return i;
 
@@ -177,23 +168,23 @@ sInt DebugInfo::GetFile(sInt fileName)
     return m_Files.size() - 1;
 }
 
-sInt DebugInfo::GetFileByName(sChar *objName)
+int32_t DebugInfo::GetFileByName(char *objName)
 {
-    sChar *p;
+    char *p;
 
     // skip path seperators
-    while ((p = (sChar*)sFindString(objName, "\\")))
+    while ((p = (char*)strstr(objName, "\\")))
         objName = p + 1;
 
-    while ((p = (sChar*)sFindString(objName, "/")))
+    while ((p = (char*)strstr(objName, "/")))
         objName = p + 1;
 
     return GetFile(MakeString(objName));
 }
 
-sInt DebugInfo::GetNameSpace(sInt name)
+int32_t DebugInfo::GetNameSpace(int32_t name)
 {
-    for (sInt i = 0; i < NameSps.size(); i++)
+    for (int32_t i = 0; i < NameSps.size(); i++)
         if (NameSps[i].name == name)
             return i;
 
@@ -205,21 +196,21 @@ sInt DebugInfo::GetNameSpace(sInt name)
     return NameSps.size() - 1;
 }
 
-sInt DebugInfo::GetNameSpaceByName(sChar *name)
+int32_t DebugInfo::GetNameSpaceByName(char *name)
 {
-    sChar *pp = name - 2;
-    sChar *p;
-    sInt cname;
+    char *pp = name - 2;
+    char *p;
+    int32_t cname;
 
-    while ((p = (sChar*)sFindString(pp + 2, "::")))
+    while ((p = (char*)strstr(pp + 2, "::")))
         pp = p;
 
-    while ((p = (sChar*)sFindString(pp + 1, ".")))
+    while ((p = (char*)strstr(pp + 1, ".")))
         pp = p;
 
     if (pp != name - 2)
     {
-        sChar buffer[2048];
+        char buffer[2048];
         sCopyString(buffer, sizeof(buffer), name, 2048 - 1);
 
         if (pp - name < 2048)
@@ -235,7 +226,7 @@ sInt DebugInfo::GetNameSpaceByName(sChar *name)
 
 void DebugInfo::StartAnalyze()
 {
-    sInt i;
+    int32_t i;
 
     for (i = 0; i < m_Files.size(); i++)
     {
@@ -250,7 +241,7 @@ void DebugInfo::StartAnalyze()
 
 void DebugInfo::FinishAnalyze()
 {
-    sInt i;
+    int32_t i;
 
     for (i = 0; i < Symbols.size(); i++)
     {
@@ -267,9 +258,9 @@ void DebugInfo::FinishAnalyze()
     }
 }
 
-sBool DebugInfo::FindSymbol(sU32 VA, DISymbol **sym)
+bool DebugInfo::FindSymbol(uint32_t VA, DISymbol **sym)
 {
-    sInt l, r, x;
+    int32_t l, r, x;
 
     l = 0;
     r = Symbols.size();
@@ -329,8 +320,8 @@ static void sAppendPrintF(std::string &str, const char *format, ...)
 std::string DebugInfo::WriteReport(const DebugFilters& filters)
 {
     std::string Report;
-    sInt i; //,j;
-    sU32 size;
+    int32_t i; //,j;
+    uint32_t size;
     const char* filterName = filters.name.empty() ? NULL : filters.name.c_str();
 
     Report.reserve(16384); // start out with 16k space
@@ -417,28 +408,28 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
     }
 
     /*
-    sSPrintF(Report,512,"\nFunctions by object file and size:\n");
-    Report += sGetStringLen(Report);
+    _snprintf(Report,512,"\nFunctions by object file and size:\n");
+    Report += strlen(Report);
 
     for(i=1;i<Symbols.size();i++)
       for(j=i;j>0;j--)
       {
-        sInt f1 = Symbols[j].FileNum;
-        sInt f2 = Symbols[j-1].FileNum;
+        int32_t f1 = Symbols[j].FileNum;
+        int32_t f2 = Symbols[j-1].FileNum;
 
-        if(f1 == -1 || f2 != -1 && sCmpStringI(Files[f1].Name.String,Files[f2].Name.String) < 0)
-          sSwap(Symbols[j],Symbols[j-1]);
+        if(f1 == -1 || f2 != -1 && stricmp(Files[f1].Name.String,Files[f2].Name.String) < 0)
+          std::swap(Symbols[j],Symbols[j-1]);
       }
 
     for(i=0;i<Symbols.size();i++)
     {
       if(Symbols[i].Class == DIC_CODE)
       {
-        sSPrintF(Report,512,"%5d.%02d: %-50s %s\n",
+        _snprintf(Report,512,"%5d.%02d: %-50s %s\n",
           Symbols[i].Size/1024,(Symbols[i].Size%1024)*100/1024,
           Symbols[i].Name,Files[Symbols[i].FileNum].Name);
 
-        Report += sGetStringLen(Report);
+        Report += strlen(Report);
       }
     }
     */
