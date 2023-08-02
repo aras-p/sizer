@@ -1,3 +1,7 @@
+WIP, 2023
+	Sizer itself is now 64 bit executable (aras)
+	Convert project file file to VS2022 (aras)
+
 0.2, 2017 06 27
 	Massively speed up execution time for large & 64 bit binaries, by changing the symbol processing loop (Lionel Fuentes)
 	Improved progress reporting; percentage printed now (aras)

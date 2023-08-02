@@ -9,3 +9,4 @@
 *.VC.db
 _ReSharper.*
 build
+/.vs/
