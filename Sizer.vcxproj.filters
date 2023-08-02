@@ -33,4 +33,8 @@
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="readme.md" />
+    <None Include="changelog.md" />
+  </ItemGroup>
 </Project>

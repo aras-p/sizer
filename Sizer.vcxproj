@@ -104,6 +104,10 @@
     <ClInclude Include="src\pdbfile.hpp" />
     <ClInclude Include="src\types.hpp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="changelog.md" />
+    <None Include="readme.md" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

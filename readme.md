@@ -2,7 +2,7 @@
 
 See [project page](http://aras-p.info/projSizer.html) for a description.
 
-Changelog [here](changelog.txt).
+Changelog [here](changelog.md).
 
 Based on code by Fabian "ryg" Giesen, http://farbrausch.com/~fg/
 
