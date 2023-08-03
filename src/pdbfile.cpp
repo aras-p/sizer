@@ -13,6 +13,7 @@
 #include "raw_pdb/PDB_RawFile.h"
 #include "raw_pdb/PDB_DBIStream.h"
 
+#include <set>
 
 struct SectionContrib
 {
@@ -51,7 +52,38 @@ static const SectionContrib* ContribFromSectionOffset(const SectionContrib* cont
     return 0;
 }
 
-static void ProcessSymbol(const SectionContrib* contribs, int contribsCount, const PDB::ImageSectionStream& imageSectionStream, const PDB::CodeView::DBI::Record* record, DebugInfo &to)
+static void AddSymbol(const SectionContrib* contribs, int contribsCount, uint32_t section, uint32_t offset, const char* name, uint32_t length, uint32_t rva, DebugInfo& to)
+{
+    const SectionContrib* contrib = ContribFromSectionOffset(contribs, contribsCount, section, offset);
+    int32_t objFile = 0;
+    int32_t sectionType = DIC_UNKNOWN;
+    if (contrib)
+    {
+        objFile = contrib->ObjFile;
+        sectionType = contrib->Type;
+        if (length == 0)
+            length = contrib->Length;
+    }
+
+    if (name == nullptr || name[0] == 0)
+        name = "<noname>";
+
+    DISymbol outSym;
+
+    to.Symbols.push_back(DISymbol());
+    outSym.mangledName = to.MakeString(name);
+    outSym.name = to.MakeString(name); //@TODO: undecorated name?
+    outSym.objFileNum = objFile;
+    outSym.VA = rva;
+    outSym.Size = length;
+    outSym.Class = sectionType;
+    outSym.NameSpNum = to.GetNameSpaceByName(name);
+
+    to.Symbols.emplace_back(outSym);
+
+}
+
+static void ProcessSymbol(const SectionContrib* contribs, int contribsCount, const PDB::ImageSectionStream& imageSectionStream, const PDB::CodeView::DBI::Record* record, DebugInfo &to, std::set<uint32_t>& seenRVAs)
 {
     const char* name = nullptr;
     uint32_t section = 0u;
@@ -97,6 +129,13 @@ static void ProcessSymbol(const SectionContrib* contribs, int contribsCount, con
         section = record->data.S_LTHREAD32.section;
         offset = record->data.S_LTHREAD32.offset;
     }
+    else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_COFFGROUP)
+    {
+        name = record->data.S_COFFGROUP.name;
+        section = record->data.S_COFFGROUP.section;
+        offset = record->data.S_COFFGROUP.offset;
+        length = record->data.S_COFFGROUP.size;
+    }
     uint32_t rva = imageSectionStream.ConvertSectionOffsetToRVA(section, offset);
     if (rva == 0u)
     {
@@ -104,33 +143,10 @@ static void ProcessSymbol(const SectionContrib* contribs, int contribsCount, con
         return;
     }
 
+    if (!seenRVAs.insert(rva).second)
+        return; // already saw this RVA
 
-    const SectionContrib *contrib = ContribFromSectionOffset(contribs, contribsCount, section, offset);
-    int32_t objFile = 0;
-    int32_t sectionType = DIC_UNKNOWN;
-    if (contrib)
-    {
-        objFile = contrib->ObjFile;
-        sectionType = contrib->Type;
-		if (length == 0)
-			length = contrib->Length;
-    }
-
-	if (name == nullptr || name[0] == 0)
-		name = "<noname>";
-
-    DISymbol outSym;
-
-    to.Symbols.push_back(DISymbol());
-    outSym.mangledName = to.MakeString(name);
-    outSym.name = to.MakeString(name); //@TODO: undecorated name?
-    outSym.objFileNum = objFile;
-    outSym.VA = rva;
-    outSym.Size = length;
-    outSym.Class = sectionType;
-    outSym.NameSpNum = to.GetNameSpaceByName(name);
-
-    to.Symbols.emplace_back(outSym);
+    AddSymbol(contribs, contribsCount, section, offset, name, length, rva, to);
 }
 
 
@@ -189,49 +205,8 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
         contributions.emplace_back(contrib);
     }
 
-    /*
-    // Note: this was the original code; that was however extremely slow especially on larger or 64 bit binaries.
-    // New code that replaces it (however it does not produce 100% identical results) is below.
-
-    // enumerate symbols by (virtual) address
-    IDiaEnumSymbolsByAddr *enumByAddr;
-    if(SUCCEEDED(Session->getSymbolsByAddr(&enumByAddr)))
-    {
-      IDiaSymbol *symbol;
-      // get first symbol to get first RVA (argh)
-      if(SUCCEEDED(enumByAddr->symbolByAddr(1,0,&symbol)))
-      {
-        uint32_t rva;
-        if(symbol->get_relativeVirtualAddress(&rva) == S_OK)
-        {
-          symbol->Release();
-
-          // now, enumerate by rva.
-          if(SUCCEEDED(enumByAddr->symbolByRVA(rva,&symbol)))
-          {
-            do
-            {
-              ProcessSymbol(symbol,to);
-              symbol->Release();
-
-              if(FAILED(enumByAddr->Next(1,&symbol,&celt)))
-                break;
-            }
-            while(celt == 1);
-          }
-        }
-        else
-          symbol->Release();
-      }
-
-      enumByAddr->Release();
-    }
-    */
-
-    // This is new code that replaces commented out code above. On one not-too-big executable this gets Sizer execution time from
-    // 448 seconds down to 1.5 seconds. However it does not list some symbols that are "weird" and are likely due to linker padding
-    // or somesuch; I did not dig in. On that particular executable, e.g. 128 kb that is coming from "* Linker *" file is gone.
-
+    // get symbols from the modules
+    std::set<uint32_t> seenRVAs;
     const PDB::ArrayView<PDB::ModuleInfoStream::Module> modules = moduleInfoStream.GetModules();
     size_t moduleCount = modules.GetLength();
     size_t processedModuleCount = 0;
@@ -247,8 +222,40 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
 
         moduleSymbolStream.ForEachSymbol([&](const PDB::CodeView::DBI::Record* record)
         {
-            ProcessSymbol(contributions.data(), contributions.size(), imageSectionStream, record, to);
+            ProcessSymbol(contributions.data(), contributions.size(), imageSectionStream, record, to, seenRVAs);
         });
+    }
+
+    // There can be public function symbols we haven't seen yet in any of the modules, especially for PDBs that don't provide module-specific information.
+    {
+        const PDB::CoalescedMSFStream symbolRecordStream = dbiStream.CreateSymbolRecordStream(rawPdbFile);
+        const PDB::PublicSymbolStream publicSymbolStream = dbiStream.CreatePublicSymbolStream(rawPdbFile);
+        const PDB::ArrayView<PDB::HashRecord> hashRecords = publicSymbolStream.GetRecords();
+        const size_t count = hashRecords.GetLength();
+
+        for (const PDB::HashRecord& hashRecord : hashRecords)
+        {
+            const PDB::CodeView::DBI::Record* record = publicSymbolStream.GetRecord(symbolRecordStream, hashRecord);
+            if ((PDB_AS_UNDERLYING(record->data.S_PUB32.flags) & PDB_AS_UNDERLYING(PDB::CodeView::DBI::PublicSymbolFlags::Function)) == 0u)
+            {
+                // ignore everything that is not a function
+                continue;
+            }
+
+            const uint32_t rva = imageSectionStream.ConvertSectionOffsetToRVA(record->data.S_PUB32.section, record->data.S_PUB32.offset);
+            if (rva == 0u)
+            {
+                // certain symbols (e.g. control-flow guard symbols) don't have a valid RVA, ignore those
+                continue;
+            }
+
+            // check whether we already know this symbol from one of the module streams
+            if (!seenRVAs.insert(rva).second)
+                continue; // already saw this RVA
+
+            //@TODO: demangle the name
+            AddSymbol(contributions.data(), contributions.size(), record->data.S_PUB32.section, record->data.S_PUB32.offset, record->data.S_PUB32.name, 0, rva, to);
+        }
     }
 }
 
