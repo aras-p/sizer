@@ -81,6 +81,9 @@
     <ClCompile Include="src\raw_pdb\PDB_Types.cpp">
       <Filter>src\raw_pdb</Filter>
     </ClCompile>
+    <ClCompile Include="src\mmapfile.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\debuginfo.hpp">
@@ -166,6 +169,9 @@
     </ClInclude>
     <ClInclude Include="src\raw_pdb\PDB_Util.h">
       <Filter>src\raw_pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mmapfile.h">
+      <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

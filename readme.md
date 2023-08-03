@@ -1,6 +1,6 @@
 # Sizer - Win32/64 executable size report utility
 
-See [project page](http://aras-p.info/projSizer.html) for a description.
+See [project page](https://aras-p.info/projSizer.html) for a description.
 
 Changelog [here](changelog.md).
 

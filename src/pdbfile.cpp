@@ -7,332 +7,35 @@
 #include "debuginfo.hpp"
 #include "pdbfile.hpp"
 
-#include <malloc.h>
-#include <windows.h>
-#include <ole2.h>
+#include "mmapfile.h"
+#include "raw_pdb/PDB.h"
+#include "raw_pdb/PDB_InfoStream.h"
+#include "raw_pdb/PDB_RawFile.h"
+#include "raw_pdb/PDB_DBIStream.h"
 
-/****************************************************************************/
 
-// I don't want to use the complete huge dia2.h headers (>350k), so here
-// goes the minimal version...
-
-enum SymTagEnum
+struct SectionContrib
 {
-    SymTagNull,
-    SymTagExe,
-    SymTagCompiland,
-    SymTagCompilandDetails,
-    SymTagCompilandEnv,
-    SymTagFunction,
-    SymTagBlock,
-    SymTagData,
-    SymTagAnnotation,
-    SymTagLabel,
-    SymTagPublicSymbol,
-    SymTagUDT,
-    SymTagEnum,
-    SymTagFunctionType,
-    SymTagPointerType,
-    SymTagArrayType,
-    SymTagBaseType,
-    SymTagTypedef,
-    SymTagBaseClass,
-    SymTagFriend,
-    SymTagFunctionArgType,
-    SymTagFuncDebugStart,
-    SymTagFuncDebugEnd,
-    SymTagUsingNamespace,
-    SymTagVTableShape,
-    SymTagVTable,
-    SymTagCustom,
-    SymTagThunk,
-    SymTagCustomType,
-    SymTagManagedType,
-    SymTagDimension,
-    SymTagMax
-};
-
-class IDiaEnumSymbols;
-class IDiaEnumSymbolsByAddr;
-class IDiaEnumTables;
-
-class IDiaDataSource;
-class IDiaSession;
-
-class IDiaSymbol;
-class IDiaSectionContrib;
-
-class IDiaTable;
-
-// not transcribed here:
-class IDiaSourceFile;
-
-class IDiaEnumSourceFiles;
-class IDiaEnumLineNumbers;
-class IDiaEnumDebugStreams;
-class IDiaEnumInjectedSources;
-
-class IDiaEnumSymbols : public IUnknown
-{
-public:
-    virtual HRESULT __stdcall get__NewEnum(IUnknown **ret) = 0;
-    virtual HRESULT __stdcall get_Count(LONG *ret) = 0;
-
-    virtual HRESULT __stdcall Item(DWORD index, IDiaSymbol **symbol) = 0;
-    virtual HRESULT __stdcall Next(ULONG celt, IDiaSymbol **rgelt, ULONG *pceltFetched) = 0;
-    virtual HRESULT __stdcall Skip(ULONG celt) = 0;
-    virtual HRESULT __stdcall Reset() = 0;
-
-    virtual HRESULT __stdcall Clone(IDiaEnumSymbols **penum) = 0;
-};
-
-class IDiaEnumSymbolsByAddr : public IUnknown
-{
-public:
-    virtual HRESULT __stdcall symbolByAddr(DWORD isect, DWORD offset, IDiaSymbol** ppSymbol) = 0;
-    virtual HRESULT __stdcall symbolByRVA(DWORD relativeVirtualAddress, IDiaSymbol** ppSymbol) = 0;
-    virtual HRESULT __stdcall symbolByVA(ULONGLONG virtualAddress, IDiaSymbol** ppSymbol) = 0;
-
-    virtual HRESULT __stdcall Next(ULONG celt, IDiaSymbol ** rgelt, ULONG* pceltFetched) = 0;
-    virtual HRESULT __stdcall Prev(ULONG celt, IDiaSymbol ** rgelt, ULONG * pceltFetched) = 0;
-
-    virtual HRESULT __stdcall Clone(IDiaEnumSymbolsByAddr **ppenum) = 0;
-};
-
-class IDiaEnumTables : public IUnknown
-{
-public:
-    virtual HRESULT __stdcall get__NewEnum(IUnknown **ret) = 0;
-    virtual HRESULT __stdcall get_Count(LONG *ret) = 0;
-
-    virtual HRESULT __stdcall Item(VARIANT index, IDiaTable **table) = 0;
-    virtual HRESULT __stdcall Next(ULONG celt, IDiaTable ** rgelt, ULONG *pceltFetched) = 0;
-    virtual HRESULT __stdcall Skip(ULONG celt) = 0;
-    virtual HRESULT __stdcall Reset() = 0;
-
-    virtual HRESULT __stdcall Clone(IDiaEnumTables **ppenum) = 0;
-};
-
-class IDiaDataSource : public IUnknown
-{
-public:
-    virtual HRESULT __stdcall get_lastError(BSTR *ret) = 0;
-
-    virtual HRESULT __stdcall loadDataFromPdb(LPCOLESTR pdbPath) = 0;
-    virtual HRESULT __stdcall loadAndValidateDataFromPdb(LPCOLESTR pdbPath, GUID *pcsig70, DWORD sig, DWORD age) = 0;
-    virtual HRESULT __stdcall loadDataForExe(LPCOLESTR executable, LPCOLESTR searchPath, IUnknown *pCallback) = 0;
-    virtual HRESULT __stdcall loadDataFromIStream(IStream *pIStream) = 0;
-
-    virtual HRESULT __stdcall openSession(IDiaSession **ppSession) = 0;
-};
-
-class IDiaSession : public IUnknown
-{
-public:
-    virtual HRESULT __stdcall get_loadAddress(ULONGLONG *ret) = 0;
-    virtual HRESULT __stdcall put_loadAddress(ULONGLONG val) = 0;
-    virtual HRESULT __stdcall get_globalScope(IDiaSymbol **sym) = 0;
-
-    virtual HRESULT __stdcall getEnumTables(IDiaEnumTables** ppEnumTables) = 0;
-    virtual HRESULT __stdcall getSymbolsByAddr(IDiaEnumSymbolsByAddr** ppEnumbyAddr) = 0;
-
-    virtual HRESULT __stdcall findChildren(IDiaSymbol* parent, enum SymTagEnum symtag, LPCOLESTR name, DWORD compareFlags, IDiaEnumSymbols** ppResult) = 0;
-    virtual HRESULT __stdcall findSymbolByAddr(DWORD isect, DWORD offset, enum SymTagEnum symtag, IDiaSymbol** ppSymbol) = 0;
-    virtual HRESULT __stdcall findSymbolByRVA(DWORD rva, enum SymTagEnum symtag, IDiaSymbol** ppSymbol) = 0;
-    virtual HRESULT __stdcall findSymbolByVA(ULONGLONG va, enum SymTagEnum symtag, IDiaSymbol** ppSymbol) = 0;
-    virtual HRESULT __stdcall findSymbolByToken(ULONG token, enum SymTagEnum symtag, IDiaSymbol** ppSymbol) = 0;
-    virtual HRESULT __stdcall symsAreEquiv(IDiaSymbol* symbolA, IDiaSymbol* symbolB) = 0;
-    virtual HRESULT __stdcall symbolById(DWORD id, IDiaSymbol** ppSymbol) = 0;
-    virtual HRESULT __stdcall findSymbolByRVAEx(DWORD rva, enum SymTagEnum symtag, IDiaSymbol** ppSymbol, long* displacement) = 0;
-    virtual HRESULT __stdcall findSymbolByVAEx(ULONGLONG va, enum SymTagEnum symtag, IDiaSymbol** ppSymbol, long* displacement) = 0;
-
-    virtual HRESULT __stdcall findFile(IDiaSymbol* pCompiland, LPCOLESTR name, DWORD compareFlags, IDiaEnumSourceFiles** ppResult) = 0;
-    virtual HRESULT __stdcall findFileById(DWORD uniqueId, IDiaSourceFile** ppResult) = 0;
-
-    virtual HRESULT __stdcall findLines(IDiaSymbol* compiland, IDiaSourceFile* file, IDiaEnumLineNumbers** ppResult) = 0;
-    virtual HRESULT __stdcall findLinesByAddr(DWORD seg, DWORD offset, DWORD length, IDiaEnumLineNumbers** ppResult) = 0;
-    virtual HRESULT __stdcall findLinesByRVA(DWORD rva, DWORD length, IDiaEnumLineNumbers** ppResult) = 0;
-    virtual HRESULT __stdcall findLinesByVA(ULONGLONG va, DWORD length, IDiaEnumLineNumbers** ppResult) = 0;
-    virtual HRESULT __stdcall findLinesByLinenum(IDiaSymbol* compiland, IDiaSourceFile* file, DWORD linenum, DWORD column, IDiaEnumLineNumbers** ppResult) = 0;
-
-    virtual HRESULT __stdcall findInjectedSource(LPCOLESTR srcFile, IDiaEnumInjectedSources** ppResult) = 0;
-    virtual HRESULT __stdcall getEnumDebugStreams(IDiaEnumDebugStreams** ppEnumDebugStreams) = 0;
-};
-
-class IDiaSymbol : public IUnknown
-{
-public:
-    virtual HRESULT __stdcall get_symIndexId(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_symTag(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_name(BSTR *ret) = 0;
-    virtual HRESULT __stdcall get_lexicalParent(IDiaSymbol **ret) = 0;
-    virtual HRESULT __stdcall get_classParent(IDiaSymbol **ret) = 0;
-    virtual HRESULT __stdcall get_type(IDiaSymbol **ret) = 0;
-    virtual HRESULT __stdcall get_dataKind(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_locationType(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_addressSection(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_addressOffset(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_relativeVirtualAddress(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_virtualAddress(ULONGLONG *ret) = 0;
-    virtual HRESULT __stdcall get_registerId(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_offset(LONG *ret) = 0;
-    virtual HRESULT __stdcall get_length(ULONGLONG *ret) = 0;
-    virtual HRESULT __stdcall get_slot(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_volatileType(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_constType(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_unalignedType(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_access(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_libraryName(BSTR *ret) = 0;
-    virtual HRESULT __stdcall get_platform(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_language(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_editAndContinueEnabled(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_frontEndMajor(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_frontEndMinor(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_frontEndBuild(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_backEndMajor(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_backEndMinor(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_backEndBuild(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_sourceFileName(BSTR *ret) = 0;
-    virtual HRESULT __stdcall get_unused(BSTR *ret) = 0;
-    virtual HRESULT __stdcall get_thunkOrdinal(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_thisAdjust(LONG *ret) = 0;
-    virtual HRESULT __stdcall get_virtualBaseOffset(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_virtual(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_intro(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_pure(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_callingConvention(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_value(VARIANT *ret) = 0;
-    virtual HRESULT __stdcall get_baseType(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_token(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_timeStamp(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_guid(GUID *ret) = 0;
-    virtual HRESULT __stdcall get_symbolsFileName(BSTR *ret) = 0;
-    virtual HRESULT __stdcall get_reference(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_count(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_bitPosition(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_arrayIndexType(IDiaSymbol **ret) = 0;
-    virtual HRESULT __stdcall get_packed(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_constructor(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_overloadedOperator(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_nested(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_hasNestedTypes(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_hasAssignmentOperator(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_hasCastOperator(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_scoped(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_virtualBaseClass(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_indirectVirtualBaseClass(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_virtualBasePointerOffset(LONG *ret) = 0;
-    virtual HRESULT __stdcall get_virtualTableShape(IDiaSymbol **ret) = 0;
-    virtual HRESULT __stdcall get_lexicalParentId(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_classParentId(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_typeId(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_arrayIndexTypeId(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_virtualTableShapeId(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_code(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_function(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_managed(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_msil(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_virtualBaseDispIndex(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_undecoratedName(BSTR *ret) = 0;
-    virtual HRESULT __stdcall get_age(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_signature(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_compilerGenerated(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_addressTaken(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_rank(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_lowerBound(IDiaSymbol **ret) = 0;
-    virtual HRESULT __stdcall get_upperBound(IDiaSymbol **ret) = 0;
-    virtual HRESULT __stdcall get_lowerBoundId(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_upperBoundId(DWORD *ret) = 0;
-
-    virtual HRESULT __stdcall get_dataBytes(DWORD cbData, DWORD *pcbData, BYTE data[]) = 0;
-    virtual HRESULT __stdcall findChildren(enum SymTagEnum symtag, LPCOLESTR name, DWORD compareFlags, IDiaEnumSymbols** ppResult) = 0;
-
-    virtual HRESULT __stdcall get_targetSection(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_targetOffset(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_targetRelativeVirtualAddress(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_targetVirtualAddress(ULONGLONG *ret) = 0;
-    virtual HRESULT __stdcall get_machineType(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_oemId(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_oemSymbolId(DWORD *ret) = 0;
-
-    virtual HRESULT __stdcall get_types(DWORD cTypes, DWORD *pcTypes, IDiaSymbol* types[]) = 0;
-    virtual HRESULT __stdcall get_typeIds(DWORD cTypes, DWORD *pcTypeIds, DWORD typeIds[]) = 0;
-
-    virtual HRESULT __stdcall get_objectPointerType(IDiaSymbol **ret) = 0;
-    virtual HRESULT __stdcall get_udtKind(DWORD *ret) = 0;
-
-    virtual HRESULT __stdcall get_undecoratedNameEx(DWORD undecorateOptions, BSTR *name) = 0;
-};
-
-class IDiaSectionContrib : public IUnknown
-{
-public:
-    virtual HRESULT __stdcall get_compiland(IDiaSymbol **ret) = 0;
-    virtual HRESULT __stdcall get_addressSection(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_addressOffset(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_relativeVirtualAddress(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_virtualAddress(ULONGLONG *ret) = 0;
-    virtual HRESULT __stdcall get_length(DWORD *ret) = 0;
-
-    virtual HRESULT __stdcall get_notPaged(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_code(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_initializedData(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_uninitializedData(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_remove(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_comdat(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_discardable(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_notCached(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_share(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_execute(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_read(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_write(BOOL *ret) = 0;
-    virtual HRESULT __stdcall get_dataCrc(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_relocationsaCrc(DWORD *ret) = 0;
-    virtual HRESULT __stdcall get_compilandId(DWORD *ret) = 0;
-};
-
-class IDiaTable : public IEnumUnknown
-{
-public:
-    virtual HRESULT __stdcall get__NewEnum(IUnknown **ret) = 0;
-    virtual HRESULT __stdcall get_name(BSTR *ret) = 0;
-    virtual HRESULT __stdcall get_Count(LONG *ret) = 0;
-
-    virtual HRESULT __stdcall Item(DWORD index, IUnknown **element) = 0;
-};
-
-class DECLSPEC_UUID("e60afbee-502d-46ae-858f-8272a09bd707")DiaSource71;
-class DECLSPEC_UUID("bce36434-2c24-499e-bf49-8bd99b0eeb68")DiaSource80;
-class DECLSPEC_UUID("4C41678E-887B-4365-A09E-925D28DB33C2")DiaSource90;
-class DECLSPEC_UUID("B86AE24D-BF2F-4ac9-B5A2-34B14E4CE11D")DiaSource100;
-class DECLSPEC_UUID("761D3BCD-1304-41D5-94E8-EAC54E4AC172")DiaSource110;
-class DECLSPEC_UUID("3bfcea48-620f-4b6b-81f7-b9af75454c7d")DiaSource120;
-class DECLSPEC_UUID("e6756135-1e65-4d17-8576-610761398c3c")DiaSource140;
-class DECLSPEC_UUID("79f1bb5f-b66e-48e5-b6a9-1545c323ca3d")IDiaDataSource;
-
-/****************************************************************************/
-
-struct PDBFileReader::SectionContrib
-{
-    DWORD Section;
-    DWORD Offset;
-    DWORD Length;
-    DWORD Compiland;
+    uint32_t Section;
+    uint32_t Offset;
+    uint32_t Length;
+    uint32_t Compiland;
     int32_t Type;
     int32_t ObjFile;
 };
 
-const PDBFileReader::SectionContrib *PDBFileReader::ContribFromSectionOffset(uint32_t sec, uint32_t offs)
+
+static const SectionContrib* ContribFromSectionOffset(const SectionContrib* contribs, int contribsCount, uint32_t sec, uint32_t offs)
 {
     int32_t l, r, x;
 
     l = 0;
-    r = nContribs;
+    r = contribsCount;
 
     while (l < r)
     {
         x = (l + r) / 2;
-        const SectionContrib &cur = Contribs[x];
+        const SectionContrib &cur = contribs[x];
 
         if (sec < cur.Section || sec == cur.Section && offs < cur.Offset)
             r = x;
@@ -348,181 +51,142 @@ const PDBFileReader::SectionContrib *PDBFileReader::ContribFromSectionOffset(uin
     return 0;
 }
 
-// helpers
-static char *BStrToString(BSTR str, char *defString = "", bool stripWhitespace = false)
+static void ProcessSymbol(const SectionContrib* contribs, int contribsCount, const PDB::ImageSectionStream& imageSectionStream, const PDB::CodeView::DBI::Record* record, DebugInfo &to)
 {
-    if (!str)
+    const char* name = nullptr;
+    uint32_t section = 0u;
+    uint32_t offset = 0u;
+    uint32_t length = 0u;
+    if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_LPROC32)
     {
-        int32_t len = strlen(defString);
-        char *buffer = new char[len + 1];
-        sCopyString(buffer, len + 1, defString, len + 1);
-
-        return buffer;
+        name = record->data.S_LPROC32.name;
+        section = record->data.S_LPROC32.section;
+        offset = record->data.S_LPROC32.offset;
+        length = record->data.S_LPROC32.codeSize;
     }
-    else
+    else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_GPROC32)
     {
-        int32_t len = SysStringLen(str);
-        char *buffer = new char[len + 1];
-
-        int32_t j = 0;
-        for (int32_t i = 0; i < len; i++)
-        {
-            if (stripWhitespace && iswspace(str[i]))
-                continue;
-            buffer[j] = (str[i] >= 32 && str[i] < 128) ? str[i] : '?';
-            ++j;
-        }
-
-        buffer[j] = 0;
-
-        return buffer;
+        name = record->data.S_GPROC32.name;
+        section = record->data.S_GPROC32.section;
+        offset = record->data.S_GPROC32.offset;
+        length = record->data.S_GPROC32.codeSize;
     }
-}
-
-static int32_t GetBStr(BSTR str, char *defString, DebugInfo &to)
-{
-    char *normalStr = BStrToString(str);
-    int32_t result = to.MakeString(normalStr);
-    delete[] normalStr;
-
-    return result;
-}
-
-void PDBFileReader::ProcessSymbol(IDiaSymbol *symbol, DebugInfo &to)
-{
-    DWORD section, offset, rva;
-    enum SymTagEnum tag;
-    ULONGLONG length = 0;
-    BSTR name = 0, undName = 0, srcFileName = 0;
-
-    symbol->get_symTag((DWORD*)&tag);
-    symbol->get_relativeVirtualAddress(&rva);
-    symbol->get_length(&length);
-    symbol->get_addressSection(&section);
-    symbol->get_addressOffset(&offset);
-
-    // get length from type for data
-    if (tag == SymTagData)
+    else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_LPROC32_ID)
     {
-        IDiaSymbol *type = NULL;
-        if (symbol->get_type(&type) == S_OK) // no SUCCEEDED test as may return S_FALSE!
-        {
-            if (FAILED(type->get_length(&length)))
-                length = 0;
-            type->Release();
-        }
-        else
-            length = 0;
+        name = record->data.S_LPROC32_ID.name;
+        section = record->data.S_LPROC32_ID.section;
+        offset = record->data.S_LPROC32_ID.offset;
+        length = record->data.S_LPROC32_ID.codeSize;
+    }
+    else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_GPROC32_ID)
+    {
+        name = record->data.S_GPROC32_ID.name;
+        section = record->data.S_GPROC32_ID.section;
+        offset = record->data.S_GPROC32_ID.offset;
+        length = record->data.S_GPROC32_ID.codeSize;
+    }
+    else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_LDATA32)
+    {
+        name = record->data.S_LDATA32.name;
+        section = record->data.S_LDATA32.section;
+        offset = record->data.S_LDATA32.offset;
+    }
+	else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_LTHREAD32)
+    {
+        name = record->data.S_LTHREAD32.name;
+        section = record->data.S_LTHREAD32.section;
+        offset = record->data.S_LTHREAD32.offset;
+    }
+    uint32_t rva = imageSectionStream.ConvertSectionOffsetToRVA(section, offset);
+    if (rva == 0u)
+    {
+        // certain symbols (e.g. control-flow guard symbols) don't have a valid RVA, ignore those
+        return;
     }
 
-    const SectionContrib *contrib = ContribFromSectionOffset(section, offset);
+
+    const SectionContrib *contrib = ContribFromSectionOffset(contribs, contribsCount, section, offset);
     int32_t objFile = 0;
     int32_t sectionType = DIC_UNKNOWN;
-
     if (contrib)
     {
         objFile = contrib->ObjFile;
         sectionType = contrib->Type;
+		if (length == 0)
+			length = contrib->Length;
     }
 
-    symbol->get_name(&name);
-    symbol->get_undecoratedName(&undName);
+	if (name == nullptr || name[0] == 0)
+		name = "<noname>";
 
-    // fill out structure
-    char *nameStr = BStrToString(name, "<noname>", true);
-    char *undNameStr = BStrToString(undName, nameStr, false);
+    DISymbol outSym;
 
     to.Symbols.push_back(DISymbol());
-    DISymbol *outSym = &to.Symbols.back();
-    outSym->mangledName = to.MakeString(nameStr);
-    outSym->name = to.MakeString(undNameStr);
-    outSym->objFileNum = objFile;
-    outSym->VA = rva;
-    outSym->Size = (uint32_t)length;
-    outSym->Class = sectionType;
-    outSym->NameSpNum = to.GetNameSpaceByName(nameStr);
+    outSym.mangledName = to.MakeString(name);
+    outSym.name = to.MakeString(name); //@TODO: undecorated name?
+    outSym.objFileNum = objFile;
+    outSym.VA = rva;
+    outSym.Size = length;
+    outSym.Class = sectionType;
+    outSym.NameSpNum = to.GetNameSpaceByName(name);
 
-    // clean up
-    delete[] nameStr;
-    if (name)
-        SysFreeString(name);
-    if (undName)
-        SysFreeString(undName);
+    to.Symbols.emplace_back(outSym);
 }
 
-void PDBFileReader::ReadEverything(DebugInfo &to)
+
+static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream& dbiStream, DebugInfo &to)
 {
-    ULONG celt;
+    //@TODO: could load the streams in parallel
+    // prepare the image section stream first. it is needed for converting section + offset into an RVA
+    const PDB::ImageSectionStream imageSectionStream = dbiStream.CreateImageSectionStream(rawPdbFile);
+    // prepare the module info stream for matching contributions against files
+    const PDB::ModuleInfoStream moduleInfoStream = dbiStream.CreateModuleInfoStream(rawPdbFile);
+    // read contribution stream
+    const PDB::SectionContributionStream sectionContributionStream = dbiStream.CreateSectionContributionStream(rawPdbFile);
 
-    Contribs = 0;
-    nContribs = 0;
+    // get all section contributions
+    const PDB::ArrayView<PDB::DBI::SectionContribution> sectionContributions = sectionContributionStream.GetContributions();
+    std::vector<SectionContrib> contributions;
+    contributions.reserve(sectionContributions.GetLength());
 
-    // read section table
-    IDiaEnumTables *enumTables;
-    if (Session->getEnumTables(&enumTables) == S_OK)
+    for (const PDB::DBI::SectionContribution& srcContrib : sectionContributions)
     {
-        VARIANT vIndex;
-        vIndex.vt = VT_BSTR;
-        vIndex.bstrVal = SysAllocString(L"Sections");
-
-        IDiaTable *secTable;
-        if (enumTables->Item(vIndex, &secTable) == S_OK)
+        const uint32_t rva = imageSectionStream.ConvertSectionOffsetToRVA(srcContrib.section, srcContrib.offset);
+        if (rva == 0u)
         {
-            LONG count;
-
-            secTable->get_Count(&count);
-            Contribs = new SectionContrib[count];
-            nContribs = 0;
-
-            IDiaSectionContrib *item;
-            while (SUCCEEDED(secTable->Next(1, (IUnknown**)&item, &celt)) && celt == 1)
-            {
-                SectionContrib &contrib = Contribs[nContribs++];
-
-                item->get_addressOffset(&contrib.Offset);
-                item->get_addressSection(&contrib.Section);
-                item->get_length(&contrib.Length);
-                item->get_compilandId(&contrib.Compiland);
-
-                BOOL code = FALSE, initData = FALSE, uninitData = FALSE;
-                item->get_code(&code);
-                item->get_initializedData(&initData);
-                item->get_uninitializedData(&uninitData);
-
-                if (code && !initData && !uninitData)
-                    contrib.Type = DIC_CODE;
-                else if (!code && initData && !uninitData)
-                    contrib.Type = DIC_DATA;
-                else if (!code && !initData && uninitData)
-                    contrib.Type = DIC_BSS;
-                else
-                    contrib.Type = DIC_UNKNOWN;
-
-                BSTR objFileName = 0;
-
-                IDiaSymbol *compiland = 0;
-                item->get_compiland(&compiland);
-                if (compiland)
-                {
-                    compiland->get_name(&objFileName);
-                    compiland->Release();
-                }
-
-                char *objFileStr = BStrToString(objFileName, "<noobjfile>");
-                contrib.ObjFile = to.GetFileByName(objFileStr);
-
-                delete[] objFileStr;
-                if (objFileName)
-                    SysFreeString(objFileName);
-
-                item->Release();
-            }
-
-            secTable->Release();
+            fprintf(stderr, "  Contribution (section %i, offset %i) has invalid RVA\n", srcContrib.section, srcContrib.offset);
+            continue;
         }
 
-        SysFreeString(vIndex.bstrVal);
-        enumTables->Release();
+        SectionContrib contrib = {};
+        contrib.Offset = srcContrib.offset; //@TODO: rva instead?
+        contrib.Section = srcContrib.section;
+        contrib.Length = srcContrib.size;
+        contrib.Compiland = srcContrib.moduleIndex;
+
+        // from IMAGE_SECTION_HEADER
+        const uint32_t IMAGE_SCN_CNT_CODE = 0x20;
+        const uint32_t IMAGE_SCN_CNT_INITIALIZED_DATA = 0x40;
+        const uint32_t IMAGE_SCN_CNT_UNINITIALIZED_DATA = 0x80;
+        bool hasCode = srcContrib.characteristics & IMAGE_SCN_CNT_CODE;
+        bool hasInitData = srcContrib.characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA;
+        bool hasUninitData = srcContrib.characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA;
+        if (hasCode && !hasInitData && !hasUninitData)
+            contrib.Type = DIC_CODE;
+        else if (!hasCode && hasInitData && !hasUninitData)
+            contrib.Type = DIC_DATA;
+        else if (!hasCode && !hasInitData && hasUninitData)
+            contrib.Type = DIC_BSS;
+        else
+            contrib.Type = DIC_UNKNOWN;
+
+        const PDB::ModuleInfoStream::Module& module = moduleInfoStream.GetModule(srcContrib.moduleIndex); //@TODO: "<noobjfile>" when none?
+        contrib.ObjFile = to.GetFileByName(module.GetName().Decay());
+        if (contrib.Type == DIC_DATA || contrib.Type == DIC_BSS)
+        {
+            //printf("Data: type %i length %i obj %s\n", contrib.Type, contrib.Length, module.GetName().Decay());
+        }
+        contributions.emplace_back(contrib);
     }
 
     /*
@@ -537,7 +201,7 @@ void PDBFileReader::ReadEverything(DebugInfo &to)
       // get first symbol to get first RVA (argh)
       if(SUCCEEDED(enumByAddr->symbolByAddr(1,0,&symbol)))
       {
-        DWORD rva;
+        uint32_t rva;
         if(symbol->get_relativeVirtualAddress(&rva) == S_OK)
         {
           symbol->Release();
@@ -567,149 +231,79 @@ void PDBFileReader::ReadEverything(DebugInfo &to)
     // This is new code that replaces commented out code above. On one not-too-big executable this gets Sizer execution time from
     // 448 seconds down to 1.5 seconds. However it does not list some symbols that are "weird" and are likely due to linker padding
     // or somesuch; I did not dig in. On that particular executable, e.g. 128 kb that is coming from "* Linker *" file is gone.
-    IDiaSymbol* globalSymbol = NULL;
-    if (SUCCEEDED(Session->get_globalScope(&globalSymbol)))
-    {
-        // Retrieve the compilands first
-        IDiaEnumSymbols *enumSymbols;
-        if (SUCCEEDED(globalSymbol->findChildren(SymTagCompiland, NULL, 0, &enumSymbols)))
-        {
-            LONG compilandCount = 0;
-            enumSymbols->get_Count(&compilandCount);
-            if (compilandCount == 0)
-                compilandCount = 1;
-            LONG processedCount = 0;
-            IDiaSymbol *compiland;
-            fprintf(stderr, "[      ]");
-            while (SUCCEEDED(enumSymbols->Next(1, &compiland, &celt)) && (celt == 1))
-            {
-                ++processedCount;
-                fprintf(stderr, "\b\b\b\b\b\b\b\b[%5.1f%%]", processedCount * 100.0 / compilandCount);
-                // Find all the symbols defined in this compiland and treat their info
-                IDiaEnumSymbols *enumChildren;
-                if (SUCCEEDED(compiland->findChildren(SymTagNull, NULL, 0, &enumChildren)))
-                {
-                    IDiaSymbol *pSymbol;
-                    ULONG celtChildren = 0;
-                    while (SUCCEEDED(enumChildren->Next(1, &pSymbol, &celtChildren)) && (celtChildren == 1))
-                    {
-                        ProcessSymbol(pSymbol, to);
-                        pSymbol->Release();
-                    }
-                    enumChildren->Release();
-                }
-                compiland->Release();
-            }
-            enumSymbols->Release();
-        }
-        globalSymbol->Release();
-    }
 
-    // clean up
-    delete[] Contribs;
+    const PDB::ArrayView<PDB::ModuleInfoStream::Module> modules = moduleInfoStream.GetModules();
+    size_t moduleCount = modules.GetLength();
+    size_t processedModuleCount = 0;
+    fprintf(stderr, "[      ]");
+    for (const PDB::ModuleInfoStream::Module& module : modules)
+    {
+        ++processedModuleCount;
+        fprintf(stderr, "\b\b\b\b\b\b\b\b[%5.1f%%]", processedModuleCount * 100.0 / moduleCount);
+        if (!module.HasSymbolStream())
+            continue;
+
+        const PDB::ModuleSymbolStream moduleSymbolStream = module.CreateSymbolStream(rawPdbFile);
+
+        moduleSymbolStream.ForEachSymbol([&](const PDB::CodeView::DBI::Record* record)
+        {
+            ProcessSymbol(contributions.data(), contributions.size(), imageSectionStream, record, to);
+        });
+    }
 }
 
-/****************************************************************************/
-
-bool PDBFileReader::ReadDebugInfo(const char *fileName, DebugInfo &to)
+// check whether the DBI stream offers all sub-streams we need
+static bool HasValidDBIStreams(const PDB::RawFile& rawPdbFile, const PDB::DBIStream& dbiStream)
 {
-    static const struct DLLDesc
-    {
-        const char *Filename;
-        IID UseCLSID;
-    } DLLs[] =
-    {
-        "msdia71.dll", __uuidof(DiaSource71),
-        "msdia80.dll", __uuidof(DiaSource80),
-        "msdia90.dll", __uuidof(DiaSource90),
-        "msdia100.dll", __uuidof(DiaSource100), // VS 2010
-        "msdia110.dll", __uuidof(DiaSource110), // VS 2012
-        "msdia120.dll", __uuidof(DiaSource120), // VS 2013
-        "msdia140.dll", __uuidof(DiaSource140), // VS 2015
-        // add more here as new versions appear (as long as they're backwards-compatible)
-        0
-    };
+    if (dbiStream.HasValidImageSectionStream(rawPdbFile) != PDB::ErrorCode::Success)
+        return false;
+    if (dbiStream.HasValidPublicSymbolStream(rawPdbFile) != PDB::ErrorCode::Success)
+        return false;
+    if (dbiStream.HasValidGlobalSymbolStream(rawPdbFile) != PDB::ErrorCode::Success)
+        return false;
+    if (dbiStream.HasValidSectionContributionStream(rawPdbFile) != PDB::ErrorCode::Success)
+        return false;
+    return true;
+}
 
-    bool readOk = false;
+bool ReadDebugInfo(const char *fileName, DebugInfo &to)
+{
+    //@TODO: if given an exe file, try to find where PDB of it is
 
-    if (FAILED(CoInitialize(0)))
+    // open the PDB file
+    MemoryMappedFile pdbFile(fileName);
+    if (pdbFile.baseAddress == nullptr)
     {
-        fprintf(stderr, "  failed to initialize COM\n");
+        fprintf(stderr, "  failed to memory-map PDB file '%s'\n", fileName);
+        return false;
+    }
+    PDB::ErrorCode errorCode = PDB::ValidateFile(pdbFile.baseAddress);
+    if (errorCode != PDB::ErrorCode::Success)
+    {
+        fprintf(stderr, "  failed to validate PDB file '%s': error code %i\n", fileName, (int)errorCode);
+        return false;
+    }
+    const PDB::RawFile rawPdbFile = PDB::CreateRawFile(pdbFile.baseAddress);
+    errorCode = PDB::HasValidDBIStream(rawPdbFile);
+    if (errorCode != PDB::ErrorCode::Success)
+    {
+        fprintf(stderr, "  PDB file '%s' does not have valid DBI stream, error code %i\n", fileName, (int)errorCode);
+        return false;
+    }
+    const PDB::InfoStream infoStream(rawPdbFile);
+    if (infoStream.UsesDebugFastLink())
+    {
+        fprintf(stderr, "  PDB file '%s' uses unsupported option /DEBUG:FASTLINK\n", fileName);
+        return false;
+    }
+    const PDB::DBIStream dbiStream = PDB::CreateDBIStream(rawPdbFile);
+    if (!HasValidDBIStreams(rawPdbFile, dbiStream))
+    {
+        fprintf(stderr, "  PDB file '%s' does not have required DBI sections\n", fileName);
         return false;
     }
 
-    IDiaDataSource *source = 0;
-    HRESULT hr = E_FAIL;
+    ReadEverything(rawPdbFile, dbiStream, to);
 
-    // Try creating things "the official way"
-    for (int32_t i = 0; DLLs[i].Filename; i++)
-    {
-        hr = CoCreateInstance(DLLs[i].UseCLSID, 0, CLSCTX_INPROC_SERVER,
-                __uuidof(IDiaDataSource), (void**)&source);
-
-        if (SUCCEEDED(hr))
-            break;
-    }
-
-    if (FAILED(hr))
-    {
-        // None of the classes are registered, but most programmers will have the
-        // DLLs on their system anyway and can copy it over; try loading it directly.
-
-        for (int32_t i = 0; DLLs[i].Filename; i++)
-        {
-            HMODULE hDIADll = LoadLibrary(DLLs[i].Filename);
-            if (hDIADll)
-            {
-                typedef HRESULT (__stdcall *PDllGetClassObject)(REFCLSID rclsid, REFIID riid, void** ppvObj);
-                PDllGetClassObject DllGetClassObject = (PDllGetClassObject)GetProcAddress(hDIADll, "DllGetClassObject");
-                if (DllGetClassObject)
-                {
-                    // first create a class factory
-                    IClassFactory *classFactory;
-                    hr = DllGetClassObject(DLLs[i].UseCLSID, IID_IClassFactory, (void**)&classFactory);
-                    if (SUCCEEDED(hr))
-                    {
-                        hr = classFactory->CreateInstance(0, __uuidof(IDiaDataSource), (void**)&source);
-                        classFactory->Release();
-                    }
-                }
-
-                if (SUCCEEDED(hr))
-                    break;
-                else
-                    FreeLibrary(hDIADll);
-            }
-        }
-    }
-
-    if (source)
-    {
-        wchar_t wideFileName[260];
-        mbstowcs(wideFileName, fileName, 260);
-        if (SUCCEEDED(source->loadDataForExe(wideFileName, 0, 0)))
-        {
-            if (SUCCEEDED(source->openSession(&Session)))
-            {
-                ReadEverything(to);
-
-                readOk = true;
-                Session->Release();
-            }
-            else
-                fprintf(stderr, "  failed to open DIA session\n");
-        }
-        else
-            fprintf(stderr, "  failed to load debug symbols (PDB not found)\n");
-
-        source->Release();
-    }
-    else
-        fprintf(stderr, "  couldn't find (or properly initialize) any DIA dll, copying msdia*.dll to app dir might help.\n");
-
-    CoUninitialize();
-
-    return readOk;
+    return true;
 }
-
-/****************************************************************************/

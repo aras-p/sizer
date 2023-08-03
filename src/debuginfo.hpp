@@ -85,16 +85,16 @@ public:
     std::vector<DISymNameSp> NameSps;
 
     // only use those before reading is finished!!
-    int32_t MakeString(char *s);
+    int32_t MakeString(const char *s);
     const char* GetStringPrep(int32_t index) const { return m_StringByIndex[index].c_str(); }
 
     void FinishedReading();
 
     int32_t GetFile(int32_t fileName);
-    int32_t GetFileByName(char *objName);
+    int32_t GetFileByName(const char *objName);
 
     int32_t GetNameSpace(int32_t name);
-    int32_t GetNameSpaceByName(char *name);
+    int32_t GetNameSpaceByName(const char *name);
 
     void StartAnalyze();
     void FinishAnalyze();

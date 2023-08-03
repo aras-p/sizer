@@ -4,6 +4,7 @@
 // Public domain.
 
 #include "pdbfile.hpp"
+#include "debuginfo.hpp"
 #include "parg.h"
 #include <cstdio>
 #include <ctime>
@@ -91,9 +92,8 @@ int main(int argc, char * const * argv)
 
     clock_t time1 = clock();
 
-    PDBFileReader pdb;
     fprintf(stderr, "Reading debug info for %s ...\n", file.c_str());
-    bool pdbok = pdb.ReadDebugInfo(file.c_str(), info);
+    bool pdbok = ReadDebugInfo(file.c_str(), info);
     if (!pdbok)
     {
         fprintf(stderr, "ERROR reading file via PDB\n");

@@ -20,7 +20,7 @@ uint32_t DebugInfo::CountSizeInClass(int32_t type) const
     return size;
 }
 
-int32_t DebugInfo::MakeString(char *s)
+int32_t DebugInfo::MakeString(const char *s)
 {
     string str(s);
     IndexByStringMap::iterator it = m_IndexByString.find(str);
@@ -168,7 +168,7 @@ int32_t DebugInfo::GetFile(int32_t fileName)
     return m_Files.size() - 1;
 }
 
-int32_t DebugInfo::GetFileByName(char *objName)
+int32_t DebugInfo::GetFileByName(const char *objName)
 {
     char *p;
 
@@ -196,9 +196,9 @@ int32_t DebugInfo::GetNameSpace(int32_t name)
     return NameSps.size() - 1;
 }
 
-int32_t DebugInfo::GetNameSpaceByName(char *name)
+int32_t DebugInfo::GetNameSpaceByName(const char *name)
 {
-    char *pp = name - 2;
+    const char *pp = name - 2;
     char *p;
     int32_t cname;
 
