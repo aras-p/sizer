@@ -89,8 +89,7 @@ static void AddSymbol(const SectionContrib* contribs, int contribsCount, uint32_
     DISymbol outSym;
 
     to.Symbols.push_back(DISymbol());
-    outSym.mangledName = to.MakeString(namePtr);
-    outSym.name = to.MakeString(namePtr); //@TODO: undecorated name?
+    outSym.name = to.MakeString(namePtr);
     outSym.objFileNum = objFile;
     outSym.VA = rva;
     outSym.Size = length;

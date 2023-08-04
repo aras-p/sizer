@@ -100,8 +100,6 @@ void DebugInfo::FinishedReading()
                 templateToIndex.insert(std::make_pair(templateName, index));
                 TemplateSymbol tsym;
                 tsym.name = templateName;
-                tsym.mangledName = GetStringPrep(sym->mangledName);
-                StripTemplateParams(tsym.mangledName);
                 tsym.count = 1;
                 tsym.size = sym->Size;
                 Templates.push_back(tsym);
@@ -352,14 +350,13 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
             break;
         if (Symbols[i].Class == DIC_CODE)
         {
-            const char* name1 = GetStringPrep(Symbols[i].mangledName);
+            const char* name1 = GetStringPrep(Symbols[i].name);
             const char* name2 = GetStringPrep(m_Files[Symbols[i].objFileNum].fileName);
-            const char* name3 = GetStringPrep(Symbols[i].name);
-            if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName) && !strstr(name3, filterName))
+            if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
                 continue;
-            sAppendPrintF(Report, "%5d.%02d: %-80s %-40s %s\n",
+            sAppendPrintF(Report, "%5d.%02d: %-80s %-40s\n",
                 Symbols[i].Size / 1024, (Symbols[i].Size % 1024) * 100 / 1024,
-                name1, name2, name3);
+                name1, name2);
         }
     }
 
@@ -374,15 +371,13 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
             break;
         if (Templates[i].count < filters.minTemplateCount)
             continue;
-        const char* name1 = Templates[i].mangledName.c_str();
-        const char* name2 = Templates[i].name.c_str();
-        if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
+        const char* name1 = Templates[i].name.c_str();
+        if (filterName && !strstr(name1, filterName))
             continue;
-        sAppendPrintF(Report, "%5d.%02d #%5d: %-80s %s\n",
+        sAppendPrintF(Report, "%5d.%02d #%5d: %-80s\n",
             Templates[i].size / 1024, (Templates[i].size % 1024) * 100 / 1024,
             Templates[i].count,
-            name1,
-            name2);
+            name1);
     }
 
     sAppendPrintF(Report, "\nData by size (kilobytes, min %.2f):\n", filters.minData/1024.0);

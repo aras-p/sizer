@@ -36,7 +36,6 @@ struct DISymNameSp // Namespace
 struct DISymbol
 {
     int32_t name;
-    int32_t mangledName;
     int32_t NameSpNum;
     int32_t objFileNum;
     uint32_t VA;
@@ -47,7 +46,6 @@ struct DISymbol
 struct TemplateSymbol
 {
     std::string name;
-    std::string mangledName;
     uint32_t size;
     uint32_t count;
 };
