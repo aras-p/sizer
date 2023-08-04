@@ -35,7 +35,7 @@ struct DISymNameSp // Namespace
 
 struct DISymbol
 {
-    int32_t name;
+    std::string name;
     int32_t NameSpNum;
     int32_t objFileNum;
     uint32_t VA;
@@ -84,8 +84,8 @@ public:
     std::vector<DISymFile> m_Files;
     std::vector<DISymNameSp> NameSps;
 
-    // only use those before reading is finished!!
-    int32_t MakeString(const char *s);
+    int32_t MakeStringPtr(const char *s);
+    int32_t MakeStringStd(const std::string& s);
     const char* GetStringPrep(int32_t index) const { return m_StringByIndex[index].c_str(); }
 
     void FinishedReading();

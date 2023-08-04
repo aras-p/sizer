@@ -82,19 +82,15 @@ static void AddSymbol(const SectionContrib* contribs, int contribsCount, uint32_
             length = contrib->Length;
     }
 
-    const char* namePtr = name.c_str();
-    if (name.empty())
-        namePtr = "<noname>";
-
     DISymbol outSym;
 
     to.Symbols.push_back(DISymbol());
-    outSym.name = to.MakeString(namePtr);
+    outSym.name = name.empty() ? "<noname>" : name;
     outSym.objFileNum = objFile;
     outSym.VA = rva;
     outSym.Size = length;
     outSym.Class = sectionType;
-    outSym.NameSpNum = to.GetNameSpaceByName(namePtr);
+    outSym.NameSpNum = to.GetNameSpaceByName(name.c_str());
 
     to.Symbols.emplace_back(outSym);
 }
@@ -184,23 +180,27 @@ static void ProcessSymbol(const PDB::ImageSectionStream& imageSectionStream, con
 
 static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream& dbiStream, DebugInfo &to)
 {
-    //@TODO: could load the streams in parallel
-    // prepare the image section stream first. it is needed for converting section + offset into an RVA
-    const PDB::ImageSectionStream imageSectionStream = dbiStream.CreateImageSectionStream(rawPdbFile);
-    // prepare the module info stream for matching contributions against files
-    const PDB::ModuleInfoStream moduleInfoStream = dbiStream.CreateModuleInfoStream(rawPdbFile);
-    // read contribution stream
-    const PDB::SectionContributionStream sectionContributionStream = dbiStream.CreateSectionContributionStream(rawPdbFile);
+    fprintf(stderr, "[      ]");
 
+    // create the PDB streams
+    const PDB::ImageSectionStream imageSectionStream = dbiStream.CreateImageSectionStream(rawPdbFile);
+    const PDB::ModuleInfoStream moduleInfoStream = dbiStream.CreateModuleInfoStream(rawPdbFile);
+    const PDB::SectionContributionStream sectionContributionStream = dbiStream.CreateSectionContributionStream(rawPdbFile);
     const PDB::CoalescedMSFStream symbolRecordStream = dbiStream.CreateSymbolRecordStream(rawPdbFile);
 
     // get all section contributions
     const PDB::ArrayView<PDB::DBI::SectionContribution> sectionContributions = sectionContributionStream.GetContributions();
     std::vector<SectionContrib> contributions;
-    contributions.reserve(sectionContributions.GetLength());
+    size_t sectionContribsSize = sectionContributions.GetLength();
+    contributions.reserve(sectionContribsSize);
 
+    size_t processedContribsCount = 0;
     for (const PDB::DBI::SectionContribution& srcContrib : sectionContributions)
     {
+        ++processedContribsCount;
+        if ((processedContribsCount & 65535) == 0)
+            fprintf(stderr, "\b\b\b\b\b\b\b\b[%5.1f%%]", processedContribsCount * 10.0 / sectionContribsSize);
+
         const uint32_t rva = imageSectionStream.ConvertSectionOffsetToRVA(srcContrib.section, srcContrib.offset);
         if (rva == 0u)
         {
@@ -209,7 +209,7 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
         }
 
         SectionContrib contrib = {};
-        contrib.Offset = srcContrib.offset; //@TODO: rva instead?
+        contrib.Offset = srcContrib.offset;
         contrib.Section = srcContrib.section;
         contrib.Length = srcContrib.size;
         contrib.Compiland = srcContrib.moduleIndex;
@@ -242,11 +242,11 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
     const PDB::ArrayView<PDB::ModuleInfoStream::Module> modules = moduleInfoStream.GetModules();
     size_t moduleCount = modules.GetLength();
     size_t processedModuleCount = 0;
-    fprintf(stderr, "[      ]");
     for (const PDB::ModuleInfoStream::Module& module : modules)
     {
         ++processedModuleCount;
-        fprintf(stderr, "\b\b\b\b\b\b\b\b[%5.1f%%]", processedModuleCount * 100.0 / moduleCount);
+        if ((processedModuleCount & 127) == 0)
+            fprintf(stderr, "\b\b\b\b\b\b\b\b[%5.1f%%]", 10.0 + processedModuleCount * 40.0 / moduleCount);
         if (!module.HasSymbolStream())
             continue;
 
@@ -339,8 +339,12 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
     }
 
     // Add symbols to the destination map
+    size_t addedSymbolCount = 0;
     for (const PDBSymbol& sym : rvaSortedSymbols)
     {
+        ++addedSymbolCount;
+        if ((addedSymbolCount & 65535) == 0)
+            fprintf(stderr, "\b\b\b\b\b\b\b\b[%5.1f%%]", 50.0 + addedSymbolCount * 50.0 / symbolCount);
         AddSymbol(contributions.data(), contributions.size(), sym.section, sym.offset, sym.name, sym.length, sym.rva, to);
     }
 }

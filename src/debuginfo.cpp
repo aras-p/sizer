@@ -20,9 +20,13 @@ uint32_t DebugInfo::CountSizeInClass(int32_t type) const
     return size;
 }
 
-int32_t DebugInfo::MakeString(const char *s)
+int32_t DebugInfo::MakeStringPtr(const char *s)
 {
-    string str(s);
+    return MakeStringStd(std::string(s));
+}
+
+int32_t DebugInfo::MakeStringStd(const std::string& str)
+{
     IndexByStringMap::iterator it = m_IndexByString.find(str);
     if (it != m_IndexByString.end())
         return it->second;
@@ -82,7 +86,7 @@ void DebugInfo::FinishedReading()
     {
         DISymbol *sym = &Symbols[i];
 
-        std::string templateName = GetStringPrep(sym->name);
+        std::string templateName = sym->name;
         bool isTemplate = StripTemplateParams(templateName);
         if (isTemplate)
         {
@@ -109,47 +113,6 @@ void DebugInfo::FinishedReading()
 
     // sort symbols by virtual address
     std::sort(Symbols.begin(), Symbols.end(), virtAddressComp);
-
-    // remove address double-covers
-    int32_t symCount = Symbols.size();
-    DISymbol *syms = new DISymbol[symCount];
-    memcpy(syms, &Symbols[0], symCount * sizeof(DISymbol));
-
-    Symbols.clear();
-    uint32_t oldVA = 0;
-    int32_t oldSize = 0;
-
-    for (int32_t i = 0; i < symCount; i++)
-    {
-        DISymbol *in = &syms[i];
-        uint32_t newVA = in->VA;
-        uint32_t newSize = in->Size;
-
-        if (oldVA != 0)
-        {
-            int32_t adjust = newVA - oldVA;
-            if (adjust < 0) // we have to shorten
-            {
-                newVA = oldVA;
-                if (newSize >= -adjust)
-                    newSize += adjust;
-            }
-        }
-
-        if (newSize || in->Class == DIC_END)
-        {
-            Symbols.push_back(DISymbol());
-            DISymbol *out = &Symbols.back();
-            *out = *in;
-            out->VA = newVA;
-            out->Size = newSize;
-
-            oldVA = newVA + newSize;
-            oldSize = newSize;
-        }
-    }
-
-    delete[] syms;
 }
 
 int32_t DebugInfo::GetFile(int32_t fileName)
@@ -171,13 +134,13 @@ int32_t DebugInfo::GetFileByName(const char *objName)
     char *p;
 
     // skip path seperators
-    while ((p = (char*)strstr(objName, "\\")))
+    while ((p = (char*)strchr(objName, '\\')))
         objName = p + 1;
 
-    while ((p = (char*)strstr(objName, "/")))
+    while ((p = (char*)strchr(objName, '/')))
         objName = p + 1;
 
-    return GetFile(MakeString(objName));
+    return GetFile(MakeStringPtr(objName));
 }
 
 int32_t DebugInfo::GetNameSpace(int32_t name)
@@ -205,7 +168,7 @@ int32_t DebugInfo::GetNameSpaceByName(const char *name)
     while ((p = (char*)strstr(pp + 2, "::")))
         pp = p;
 
-    while ((p = (char*)strstr(pp + 1, ".")))
+    while ((p = (char*)strchr(pp + 1, '.')))
         pp = p;
 
     if (pp != name - 2)
@@ -216,10 +179,10 @@ int32_t DebugInfo::GetNameSpaceByName(const char *name)
         if (pp - name < 2048)
             buffer[pp - name] = 0;
 
-        cname = MakeString(buffer);
+        cname = MakeStringPtr(buffer);
     }
     else
-        cname = MakeString("<global>");
+        cname = MakeStringPtr("<global>");
 
     return GetNameSpace(cname);
 }
@@ -350,7 +313,7 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
             break;
         if (Symbols[i].Class == DIC_CODE)
         {
-            const char* name1 = GetStringPrep(Symbols[i].name);
+            const char* name1 = Symbols[i].name.c_str();
             const char* name2 = GetStringPrep(m_Files[Symbols[i].objFileNum].fileName);
             if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
                 continue;
@@ -387,7 +350,7 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
             break;
         if (Symbols[i].Class == DIC_DATA)
         {
-            const char* name1 = GetStringPrep(Symbols[i].name);
+            const char* name1 = Symbols[i].name.c_str();
             const char* name2 = GetStringPrep(m_Files[Symbols[i].objFileNum].fileName);
             if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
                 continue;
@@ -404,7 +367,7 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
             break;
         if (Symbols[i].Class == DIC_BSS)
         {
-            const char* name1 = GetStringPrep(Symbols[i].name);
+            const char* name1 = Symbols[i].name.c_str();
             const char* name2 = GetStringPrep(m_Files[Symbols[i].objFileNum].fileName);
             if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
                 continue;
