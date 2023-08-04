@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <set>
+#include <unordered_map>
 
 struct SectionContrib
 {
@@ -24,6 +25,15 @@ struct SectionContrib
     uint32_t Compiland;
     int32_t Type;
     int32_t ObjFile;
+};
+
+struct PDBSymbol
+{
+    std::string name;
+    uint32_t rva = 0;
+    uint32_t length = 0;
+    uint32_t section = 0;
+    uint32_t offset = 0;
 };
 
 
@@ -53,7 +63,10 @@ static const SectionContrib* ContribFromSectionOffset(const SectionContrib* cont
     return 0;
 }
 
-static void AddSymbol(const SectionContrib* contribs, int contribsCount, uint32_t section, uint32_t offset, const char* name, uint32_t length, uint32_t rva, DebugInfo& to)
+typedef std::unordered_map<uint32_t, PDBSymbol> RVAToSymbolMap;
+
+
+static void AddSymbol(const SectionContrib* contribs, int contribsCount, uint32_t section, uint32_t offset, const std::string& name, uint32_t length, uint32_t rva, DebugInfo& to)
 {
     const SectionContrib* contrib = ContribFromSectionOffset(contribs, contribsCount, section, offset);
     int32_t objFile = 0;
@@ -66,95 +79,91 @@ static void AddSymbol(const SectionContrib* contribs, int contribsCount, uint32_
             length = contrib->Length;
     }
 
-    if (name == nullptr || name[0] == 0)
-        name = "<noname>";
+    const char* namePtr = name.c_str();
+    if (name.empty())
+        namePtr = "<noname>";
 
     DISymbol outSym;
 
     to.Symbols.push_back(DISymbol());
-    outSym.mangledName = to.MakeString(name);
-    outSym.name = to.MakeString(name); //@TODO: undecorated name?
+    outSym.mangledName = to.MakeString(namePtr);
+    outSym.name = to.MakeString(namePtr); //@TODO: undecorated name?
     outSym.objFileNum = objFile;
     outSym.VA = rva;
     outSym.Size = length;
     outSym.Class = sectionType;
-    outSym.NameSpNum = to.GetNameSpaceByName(name);
+    outSym.NameSpNum = to.GetNameSpaceByName(namePtr);
 
     to.Symbols.emplace_back(outSym);
 }
 
-static void ProcessSymbol(const SectionContrib* contribs, int contribsCount, const PDB::ImageSectionStream& imageSectionStream, const PDB::CodeView::DBI::Record* record, DebugInfo &to, std::set<uint32_t>& seenRVAs)
+static void ProcessSymbol(const PDB::ImageSectionStream& imageSectionStream, const PDB::CodeView::DBI::Record* record, RVAToSymbolMap& toMap)
 {
-    const char* name = nullptr;
-    uint32_t section = 0u;
-    uint32_t offset = 0u;
-    uint32_t length = 0u;
+    PDBSymbol symbol;
     if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_LPROC32)
     {
-        name = record->data.S_LPROC32.name;
-        section = record->data.S_LPROC32.section;
-        offset = record->data.S_LPROC32.offset;
-        length = record->data.S_LPROC32.codeSize;
+        symbol.name = record->data.S_LPROC32.name;
+        symbol.section = record->data.S_LPROC32.section;
+        symbol.offset = record->data.S_LPROC32.offset;
+        symbol.length = record->data.S_LPROC32.codeSize;
     }
     else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_GPROC32)
     {
-        name = record->data.S_GPROC32.name;
-        section = record->data.S_GPROC32.section;
-        offset = record->data.S_GPROC32.offset;
-        length = record->data.S_GPROC32.codeSize;
+        symbol.name = record->data.S_GPROC32.name;
+        symbol.section = record->data.S_GPROC32.section;
+        symbol.offset = record->data.S_GPROC32.offset;
+        symbol.length = record->data.S_GPROC32.codeSize;
     }
     else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_LPROC32_ID)
     {
-        name = record->data.S_LPROC32_ID.name;
-        section = record->data.S_LPROC32_ID.section;
-        offset = record->data.S_LPROC32_ID.offset;
-        length = record->data.S_LPROC32_ID.codeSize;
+        symbol.name = record->data.S_LPROC32_ID.name;
+        symbol.section = record->data.S_LPROC32_ID.section;
+        symbol.offset = record->data.S_LPROC32_ID.offset;
+        symbol.length = record->data.S_LPROC32_ID.codeSize;
     }
     else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_GPROC32_ID)
     {
-        name = record->data.S_GPROC32_ID.name;
-        section = record->data.S_GPROC32_ID.section;
-        offset = record->data.S_GPROC32_ID.offset;
-        length = record->data.S_GPROC32_ID.codeSize;
+        symbol.name = record->data.S_GPROC32_ID.name;
+        symbol.section = record->data.S_GPROC32_ID.section;
+        symbol.offset = record->data.S_GPROC32_ID.offset;
+        symbol.length = record->data.S_GPROC32_ID.codeSize;
     }
     else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_LDATA32)
     {
-        name = record->data.S_LDATA32.name;
-        if (name != nullptr && name[0] != 0)
+        symbol.name = record->data.S_LDATA32.name;
+        // Often there are LDATA32 symbols without a name that are same size as function entries? Skip those.
+        if (!symbol.name.empty())
         {
-            section = record->data.S_LDATA32.section;
-            offset = record->data.S_LDATA32.offset;
+            symbol.section = record->data.S_LDATA32.section;
+            symbol.offset = record->data.S_LDATA32.offset;
         }
     }
     else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_GDATA32)
     {
-        name = record->data.S_GDATA32.name;
-        section = record->data.S_GDATA32.section;
-        offset = record->data.S_GDATA32.offset;
+        symbol.name = record->data.S_GDATA32.name;
+        symbol.section = record->data.S_GDATA32.section;
+        symbol.offset = record->data.S_GDATA32.offset;
     }
     else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_LTHREAD32)
     {
-        name = record->data.S_LTHREAD32.name;
-        section = record->data.S_LTHREAD32.section;
-        offset = record->data.S_LTHREAD32.offset;
+        symbol.name = record->data.S_LTHREAD32.name;
+        symbol.section = record->data.S_LTHREAD32.section;
+        symbol.offset = record->data.S_LTHREAD32.offset;
     }
     else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_GTHREAD32)
     {
-        name = record->data.S_GTHREAD32.name;
-        section = record->data.S_GTHREAD32.section;
-        offset = record->data.S_GTHREAD32.offset;
+        symbol.name = record->data.S_GTHREAD32.name;
+        symbol.section = record->data.S_GTHREAD32.section;
+        symbol.offset = record->data.S_GTHREAD32.offset;
     }
-    uint32_t rva = imageSectionStream.ConvertSectionOffsetToRVA(section, offset);
-    if (rva == 0u)
+    symbol.rva = imageSectionStream.ConvertSectionOffsetToRVA(symbol.section, symbol.offset);
+    if (symbol.rva == 0u)
     {
         // certain symbols (e.g. control-flow guard symbols) don't have a valid RVA, ignore those
         return;
     }
 
-    if (!seenRVAs.insert(rva).second)
-        return; // already saw this RVA
-
-    AddSymbol(contribs, contribsCount, section, offset, name, length, rva, to);
+    toMap.insert({ symbol.rva, symbol });
 }
 
 
@@ -211,8 +220,10 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
         contributions.emplace_back(contrib);
     }
 
+    RVAToSymbolMap rvaToSymbol;
+    rvaToSymbol.reserve(1024);
+
     // get symbols from the modules
-    std::set<uint32_t> seenRVAs;
     const PDB::ArrayView<PDB::ModuleInfoStream::Module> modules = moduleInfoStream.GetModules();
     size_t moduleCount = modules.GetLength();
     size_t processedModuleCount = 0;
@@ -227,7 +238,7 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
         const PDB::ModuleSymbolStream moduleSymbolStream = module.CreateSymbolStream(rawPdbFile);
         moduleSymbolStream.ForEachSymbol([&](const PDB::CodeView::DBI::Record* record)
         {
-            ProcessSymbol(contributions.data(), contributions.size(), imageSectionStream, record, to, seenRVAs);
+            ProcessSymbol(imageSectionStream, record, rvaToSymbol);
         });
     }
 
@@ -254,6 +265,42 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
         }
     }
     */
+
+    // Gather all symbols, sort by RVA, figure out sizes of the ones that did not have a size
+    std::vector<PDBSymbol> rvaSortedSymbols;
+    const size_t symbolCount = rvaToSymbol.size();
+    rvaSortedSymbols.reserve(symbolCount);
+    for (const auto& sym : rvaToSymbol)
+        rvaSortedSymbols.push_back(sym.second);
+    rvaToSymbol.clear();
+
+    std::sort(rvaSortedSymbols.begin(), rvaSortedSymbols.end(), [](const auto& a, const auto& b) { return a.rva < b.rva; });
+
+    if (symbolCount != 0)
+    {
+        for (size_t i = 0; i < symbolCount - 1; ++i)
+        {
+            PDBSymbol& curr = rvaSortedSymbols[i];
+            if (curr.length == 0)
+            {
+                const PDBSymbol& next = rvaSortedSymbols[i + 1];
+                // Estimate symbol length by either difference in RVA of next & current symbol, or from the contribution,
+                // whichever is smaller.
+                //@TODO: improve this logic, it over-estimates for a bunch of data symbols
+                curr.length = next.rva - curr.rva;
+                const SectionContrib* contrib = ContribFromSectionOffset(contributions.data(), contributions.size(), curr.section, curr.offset);
+                if (contrib && contrib->Length < curr.length)
+                    curr.length = contrib->Length;
+            }
+        }
+        //@TODO: last one?
+    }
+
+    // Add symbols to the destination map
+    for (const PDBSymbol& sym : rvaSortedSymbols)
+    {
+        AddSymbol(contributions.data(), contributions.size(), sym.section, sym.offset, sym.name, sym.length, sym.rva, to);
+    }
 }
 
 // check whether the DBI stream offers all sub-streams we need
