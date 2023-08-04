@@ -72,9 +72,11 @@ class DebugInfo
 {
     typedef std::vector<string>   StringByIndexVector;
     typedef std::map<string, int32_t> IndexByStringMap;
+    typedef std::map<int32_t, size_t> NameIndexToArrayIndexMap;
 
     StringByIndexVector m_StringByIndex;
     IndexByStringMap  m_IndexByString;
+    NameIndexToArrayIndexMap m_NameSpaceIndexByName;
 
     uint32_t CountSizeInClass(int32_t type) const;
 

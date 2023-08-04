@@ -184,16 +184,18 @@ int32_t DebugInfo::GetFileByName(const char *objName)
 
 int32_t DebugInfo::GetNameSpace(int32_t name)
 {
-    for (int32_t i = 0; i < NameSps.size(); i++)
-        if (NameSps[i].name == name)
-            return i;
+    const auto it = m_NameSpaceIndexByName.find(name);
+    if (it != m_NameSpaceIndexByName.end())
+        return it->second;
 
     DISymNameSp namesp;
     namesp.name = name;
     namesp.codeSize = namesp.dataSize = 0;
     NameSps.push_back(namesp);
 
-    return NameSps.size() - 1;
+    int32_t index = NameSps.size() - 1;
+    m_NameSpaceIndexByName.insert({name, index});
+    return index;
 }
 
 int32_t DebugInfo::GetNameSpaceByName(const char *name)
@@ -285,7 +287,9 @@ bool DebugInfo::FindSymbol(uint32_t VA, DISymbol **sym)
 
 static bool symSizeComp(const DISymbol &a, const DISymbol &b)
 {
-    return a.Size > b.Size;
+    if (a.Size != b.Size)
+        return a.Size > b.Size;
+    return a.VA < b.VA;
 }
 
 static bool templateSizeComp(const TemplateSymbol& a, const TemplateSymbol& b)
