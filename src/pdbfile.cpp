@@ -103,7 +103,16 @@ static void AddSymbol(const SectionContrib* contribs, int contribsCount, uint32_
 static void ProcessSymbol(const PDB::ImageSectionStream& imageSectionStream, const PDB::CodeView::DBI::Record* record, RVAToSymbolMap& toMap)
 {
     PDBSymbol symbol;
-    if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_LPROC32)
+    if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_PUB32)
+    {
+        if (PDB_AS_UNDERLYING(record->data.S_PUB32.flags) & PDB_AS_UNDERLYING(PDB::CodeView::DBI::PublicSymbolFlags::Function))
+        {
+            symbol.name = record->data.S_PUB32.name;
+            symbol.section = record->data.S_PUB32.section;
+            symbol.offset = record->data.S_PUB32.offset;
+        }
+    }
+    else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_LPROC32)
     {
         symbol.name = record->data.S_LPROC32.name;
         symbol.section = record->data.S_LPROC32.section;
@@ -259,8 +268,6 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
             ProcessSymbol(imageSectionStream, record, rvaToSymbol);
         }
     }
-    /*
-
     // There can be public function symbols we haven't seen yet in any of the modules, especially for PDBs that don't provide module-specific information.
     {
         const PDB::PublicSymbolStream publicSymbolStream = dbiStream.CreatePublicSymbolStream(rawPdbFile);
@@ -268,10 +275,9 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
         for (const PDB::HashRecord& hashRecord : hashRecords)
         {
             const PDB::CodeView::DBI::Record* record = publicSymbolStream.GetRecord(symbolRecordStream, hashRecord);
-            ProcessSymbol(contributions.data(), contributions.size(), imageSectionStream, record, to, seenRVAs);
+            ProcessSymbol(imageSectionStream, record, rvaToSymbol);
         }
     }
-    */
 
     // Gather all symbols, sort by RVA, figure out sizes of the ones that did not have a size
     std::vector<PDBSymbol> rvaSortedSymbols;
