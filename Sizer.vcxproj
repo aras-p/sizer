@@ -98,6 +98,7 @@
     <ClCompile Include="src\mmapfile.cpp" />
     <ClCompile Include="src\parg.c" />
     <ClCompile Include="src\pdbfile.cpp" />
+    <ClCompile Include="src\pdb_typetable.cpp" />
     <ClCompile Include="src\raw_pdb\PDB.cpp" />
     <ClCompile Include="src\raw_pdb\PDB_CoalescedMSFStream.cpp" />
     <ClCompile Include="src\raw_pdb\PDB_DBIStream.cpp" />
@@ -124,6 +125,7 @@
     <ClInclude Include="src\mmapfile.h" />
     <ClInclude Include="src\parg.h" />
     <ClInclude Include="src\pdbfile.hpp" />
+    <ClInclude Include="src\pdb_typetable.hpp" />
     <ClInclude Include="src\raw_pdb\PDB.h" />
     <ClInclude Include="src\raw_pdb\PDB_CoalescedMSFStream.h" />
     <ClInclude Include="src\raw_pdb\PDB_DBIStream.h" />

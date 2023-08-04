@@ -12,6 +12,8 @@
 #include "raw_pdb/PDB_InfoStream.h"
 #include "raw_pdb/PDB_RawFile.h"
 #include "raw_pdb/PDB_DBIStream.h"
+#include "raw_pdb/PDB_TPIStream.h"
+#include "pdb_typetable.hpp"
 
 #include <algorithm>
 #include <set>
@@ -34,6 +36,7 @@ struct PDBSymbol
     uint32_t length = 0;
     uint32_t section = 0;
     uint32_t offset = 0;
+    uint32_t typeIndex = 0;
 };
 
 
@@ -136,6 +139,7 @@ static void ProcessSymbol(const PDB::ImageSectionStream& imageSectionStream, con
         {
             symbol.section = record->data.S_LDATA32.section;
             symbol.offset = record->data.S_LDATA32.offset;
+            symbol.typeIndex = record->data.S_LDATA32.typeIndex;
         }
     }
     else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_GDATA32)
@@ -143,18 +147,21 @@ static void ProcessSymbol(const PDB::ImageSectionStream& imageSectionStream, con
         symbol.name = record->data.S_GDATA32.name;
         symbol.section = record->data.S_GDATA32.section;
         symbol.offset = record->data.S_GDATA32.offset;
+        symbol.typeIndex = record->data.S_GDATA32.typeIndex;
     }
     else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_LTHREAD32)
     {
         symbol.name = record->data.S_LTHREAD32.name;
         symbol.section = record->data.S_LTHREAD32.section;
         symbol.offset = record->data.S_LTHREAD32.offset;
+        symbol.typeIndex = record->data.S_LTHREAD32.typeIndex;
     }
     else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_GTHREAD32)
     {
         symbol.name = record->data.S_GTHREAD32.name;
         symbol.section = record->data.S_GTHREAD32.section;
         symbol.offset = record->data.S_GTHREAD32.offset;
+        symbol.typeIndex = record->data.S_GTHREAD32.typeIndex;
     }
     symbol.rva = imageSectionStream.ConvertSectionOffsetToRVA(symbol.section, symbol.offset);
     if (symbol.rva == 0u)
@@ -278,22 +285,52 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
 
     if (symbolCount != 0)
     {
-        for (size_t i = 0; i < symbolCount - 1; ++i)
+        const PDB::TPIStream tpiStream = PDB::CreateTPIStream(rawPdbFile);
+        //@TODO: need to check for valid TPI streams? check with stripped PDBs
+        TypeTable typeTable(tpiStream);
+
+        std::unordered_map<uint32_t, size_t> typeSizeCache;
+
+        for (size_t i = 0; i < symbolCount; ++i)
         {
             PDBSymbol& curr = rvaSortedSymbols[i];
-            if (curr.length == 0)
+            if (curr.length != 0)
+                continue;
+
+            // Estimate symbol length by: type size, contribution size, difference between curr and next
+            // symbol. Whichever is available and smaller.
+
+            // Type size:
+            if (curr.typeIndex != 0)
+            {
+                size_t typeSize = 0;
+                auto it = typeSizeCache.find(curr.typeIndex);
+                if (it != typeSizeCache.end())
+                {
+                    typeSize = it->second;
+                }
+                {
+                    typeSize = PDBGetTypeSize(typeTable, curr.typeIndex);
+                    typeSizeCache.insert({curr.typeIndex, typeSize});
+                }
+                if (typeSize != 0)
+                    curr.length = typeSize;
+            }
+
+            // Contribution:
+            const SectionContrib* contrib = ContribFromSectionOffset(contributions.data(), contributions.size(), curr.section, curr.offset);
+            if (contrib && (contrib->Length < curr.length || curr.length == 0))
+                curr.length = contrib->Length;
+
+            // Difference between symbols:
+            if (i != symbolCount - 1)
             {
                 const PDBSymbol& next = rvaSortedSymbols[i + 1];
-                // Estimate symbol length by either difference in RVA of next & current symbol, or from the contribution,
-                // whichever is smaller.
-                //@TODO: improve this logic, it over-estimates for a bunch of data symbols
-                curr.length = next.rva - curr.rva;
-                const SectionContrib* contrib = ContribFromSectionOffset(contributions.data(), contributions.size(), curr.section, curr.offset);
-                if (contrib && contrib->Length < curr.length)
-                    curr.length = contrib->Length;
+                uint32_t rvaSize = next.rva - curr.rva;
+                if (rvaSize != 0 && (rvaSize < curr.length || curr.length == 0))
+                    curr.length = rvaSize;
             }
         }
-        //@TODO: last one?
     }
 
     // Add symbols to the destination map
