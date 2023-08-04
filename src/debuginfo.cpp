@@ -294,17 +294,25 @@ static bool symSizeComp(const DISymbol &a, const DISymbol &b)
 
 static bool templateSizeComp(const TemplateSymbol& a, const TemplateSymbol& b)
 {
-    return a.size > b.size;
+    if (a.size != b.size)
+        return a.size > b.size;
+    if (a.count != b.count)
+        return a.count > b.count;
+    return a.name.length() < b.name.length();
 }
 
 static bool nameCodeSizeComp(const DISymNameSp &a, const DISymNameSp &b)
 {
-    return a.codeSize > b.codeSize;
+    if (a.codeSize != b.codeSize)
+        return a.codeSize > b.codeSize;
+    return a.dataSize > b.dataSize;
 }
 
 static bool fileCodeSizeComp(const DISymFile &a, const DISymFile &b)
 {
-    return a.codeSize > b.codeSize;
+    if (a.codeSize != b.codeSize)
+        return a.codeSize > b.codeSize;
+    return a.dataSize > b.dataSize;
 }
 
 static void sAppendPrintF(std::string &str, const char *format, ...)
