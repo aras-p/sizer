@@ -87,6 +87,9 @@
     <ClCompile Include="src\pdb_typetable.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\pe_utils.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\debuginfo.hpp">
@@ -177,6 +180,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\pdb_typetable.hpp">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\pe_utils.hpp">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

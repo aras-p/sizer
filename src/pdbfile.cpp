@@ -230,7 +230,7 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
         else
             contrib.Type = DIC_UNKNOWN;
 
-        const PDB::ModuleInfoStream::Module& module = moduleInfoStream.GetModule(srcContrib.moduleIndex); //@TODO: "<noobjfile>" when none?
+        const PDB::ModuleInfoStream::Module& module = moduleInfoStream.GetModule(srcContrib.moduleIndex);
         contrib.ObjFile = to.GetFileByName(module.GetName().Decay());
         contributions.emplace_back(contrib);
     }
@@ -291,7 +291,6 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
     if (symbolCount != 0)
     {
         const PDB::TPIStream tpiStream = PDB::CreateTPIStream(rawPdbFile);
-        //@TODO: need to check for valid TPI streams? check with stripped PDBs
         TypeTable typeTable(tpiStream);
 
         std::unordered_map<uint32_t, size_t> typeSizeCache;
@@ -365,8 +364,6 @@ static bool HasValidDBIStreams(const PDB::RawFile& rawPdbFile, const PDB::DBIStr
 
 bool ReadDebugInfo(const char *fileName, DebugInfo &to)
 {
-    //@TODO: if given an exe file, try to find where PDB of it is
-
     // open the PDB file
     MemoryMappedFile pdbFile(fileName);
     if (pdbFile.baseAddress == nullptr)

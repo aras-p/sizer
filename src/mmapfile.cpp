@@ -13,6 +13,9 @@ MemoryMappedFile::MemoryMappedFile(const char* path)
 		return;
 	}
 
+	LARGE_INTEGER fileSize = {};
+	GetFileSizeEx(file, &fileSize);
+
 	void* fileMapping = CreateFileMappingW(file, nullptr, PAGE_READONLY, 0, 0, nullptr);
 	if (fileMapping == nullptr)
 	{
@@ -31,6 +34,7 @@ MemoryMappedFile::MemoryMappedFile(const char* path)
 	this->file = file;
 	this->mapping = fileMapping;
 	this->baseAddress = baseAddress;
+	this->fileSize = fileSize.QuadPart;
 }
 
 MemoryMappedFile::~MemoryMappedFile()

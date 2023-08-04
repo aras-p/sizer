@@ -317,7 +317,7 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
             const char* name2 = GetStringPrep(m_Files[Symbols[i].objFileNum].fileName);
             if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
                 continue;
-            sAppendPrintF(Report, "%5d.%02d: %-80s %-40s\n",
+            sAppendPrintF(Report, "%5d.%02d: %-80s %s\n",
                 Symbols[i].Size / 1024, (Symbols[i].Size % 1024) * 100 / 1024,
                 name1, name2);
         }
@@ -337,7 +337,7 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
         const char* name1 = Templates[i].name.c_str();
         if (filterName && !strstr(name1, filterName))
             continue;
-        sAppendPrintF(Report, "%5d.%02d #%5d: %-80s\n",
+        sAppendPrintF(Report, "%5d.%02d #%5d: %s\n",
             Templates[i].size / 1024, (Templates[i].size % 1024) * 100 / 1024,
             Templates[i].count,
             name1);
