@@ -184,7 +184,7 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
     // read contribution stream
     const PDB::SectionContributionStream sectionContributionStream = dbiStream.CreateSectionContributionStream(rawPdbFile);
 
-    //const PDB::CoalescedMSFStream symbolRecordStream = dbiStream.CreateSymbolRecordStream(rawPdbFile);
+    const PDB::CoalescedMSFStream symbolRecordStream = dbiStream.CreateSymbolRecordStream(rawPdbFile);
 
     // get all section contributions
     const PDB::ArrayView<PDB::DBI::SectionContribution> sectionContributions = sectionContributionStream.GetContributions();
@@ -250,16 +250,16 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
     }
 
     // get global symbols
-    /*
     {
         const PDB::GlobalSymbolStream globalSymbolStream = dbiStream.CreateGlobalSymbolStream(rawPdbFile);
         const PDB::ArrayView<PDB::HashRecord> hashRecords = globalSymbolStream.GetRecords();
         for (const PDB::HashRecord& hashRecord : hashRecords)
         {
             const PDB::CodeView::DBI::Record* record = globalSymbolStream.GetRecord(symbolRecordStream, hashRecord);
-            ProcessSymbol(contributions.data(), contributions.size(), imageSectionStream, record, to, seenRVAs);
+            ProcessSymbol(imageSectionStream, record, rvaToSymbol);
         }
     }
+    /*
 
     // There can be public function symbols we haven't seen yet in any of the modules, especially for PDBs that don't provide module-specific information.
     {
