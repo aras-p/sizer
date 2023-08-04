@@ -13,6 +13,7 @@
 #include "raw_pdb/PDB_RawFile.h"
 #include "raw_pdb/PDB_DBIStream.h"
 
+#include <algorithm>
 #include <set>
 
 struct SectionContrib
@@ -80,7 +81,6 @@ static void AddSymbol(const SectionContrib* contribs, int contribsCount, uint32_
     outSym.NameSpNum = to.GetNameSpaceByName(name);
 
     to.Symbols.emplace_back(outSym);
-
 }
 
 static void ProcessSymbol(const SectionContrib* contribs, int contribsCount, const PDB::ImageSectionStream& imageSectionStream, const PDB::CodeView::DBI::Record* record, DebugInfo &to, std::set<uint32_t>& seenRVAs)
@@ -120,21 +120,29 @@ static void ProcessSymbol(const SectionContrib* contribs, int contribsCount, con
     else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_LDATA32)
     {
         name = record->data.S_LDATA32.name;
-        section = record->data.S_LDATA32.section;
-        offset = record->data.S_LDATA32.offset;
+        if (name != nullptr && name[0] != 0)
+        {
+            section = record->data.S_LDATA32.section;
+            offset = record->data.S_LDATA32.offset;
+        }
     }
-	else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_LTHREAD32)
+    else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_GDATA32)
+    {
+        name = record->data.S_GDATA32.name;
+        section = record->data.S_GDATA32.section;
+        offset = record->data.S_GDATA32.offset;
+    }
+    else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_LTHREAD32)
     {
         name = record->data.S_LTHREAD32.name;
         section = record->data.S_LTHREAD32.section;
         offset = record->data.S_LTHREAD32.offset;
     }
-    else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_COFFGROUP)
+    else if (record->header.kind == PDB::CodeView::DBI::SymbolRecordKind::S_GTHREAD32)
     {
-        name = record->data.S_COFFGROUP.name;
-        section = record->data.S_COFFGROUP.section;
-        offset = record->data.S_COFFGROUP.offset;
-        length = record->data.S_COFFGROUP.size;
+        name = record->data.S_GTHREAD32.name;
+        section = record->data.S_GTHREAD32.section;
+        offset = record->data.S_GTHREAD32.offset;
     }
     uint32_t rva = imageSectionStream.ConvertSectionOffsetToRVA(section, offset);
     if (rva == 0u)
@@ -159,6 +167,8 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
     const PDB::ModuleInfoStream moduleInfoStream = dbiStream.CreateModuleInfoStream(rawPdbFile);
     // read contribution stream
     const PDB::SectionContributionStream sectionContributionStream = dbiStream.CreateSectionContributionStream(rawPdbFile);
+
+    //const PDB::CoalescedMSFStream symbolRecordStream = dbiStream.CreateSymbolRecordStream(rawPdbFile);
 
     // get all section contributions
     const PDB::ArrayView<PDB::DBI::SectionContribution> sectionContributions = sectionContributionStream.GetContributions();
@@ -198,10 +208,6 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
 
         const PDB::ModuleInfoStream::Module& module = moduleInfoStream.GetModule(srcContrib.moduleIndex); //@TODO: "<noobjfile>" when none?
         contrib.ObjFile = to.GetFileByName(module.GetName().Decay());
-        if (contrib.Type == DIC_DATA || contrib.Type == DIC_BSS)
-        {
-            //printf("Data: type %i length %i obj %s\n", contrib.Type, contrib.Length, module.GetName().Decay());
-        }
         contributions.emplace_back(contrib);
     }
 
@@ -219,44 +225,35 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
             continue;
 
         const PDB::ModuleSymbolStream moduleSymbolStream = module.CreateSymbolStream(rawPdbFile);
-
         moduleSymbolStream.ForEachSymbol([&](const PDB::CodeView::DBI::Record* record)
         {
             ProcessSymbol(contributions.data(), contributions.size(), imageSectionStream, record, to, seenRVAs);
         });
     }
 
+    // get global symbols
+    /*
+    {
+        const PDB::GlobalSymbolStream globalSymbolStream = dbiStream.CreateGlobalSymbolStream(rawPdbFile);
+        const PDB::ArrayView<PDB::HashRecord> hashRecords = globalSymbolStream.GetRecords();
+        for (const PDB::HashRecord& hashRecord : hashRecords)
+        {
+            const PDB::CodeView::DBI::Record* record = globalSymbolStream.GetRecord(symbolRecordStream, hashRecord);
+            ProcessSymbol(contributions.data(), contributions.size(), imageSectionStream, record, to, seenRVAs);
+        }
+    }
+
     // There can be public function symbols we haven't seen yet in any of the modules, especially for PDBs that don't provide module-specific information.
     {
-        const PDB::CoalescedMSFStream symbolRecordStream = dbiStream.CreateSymbolRecordStream(rawPdbFile);
         const PDB::PublicSymbolStream publicSymbolStream = dbiStream.CreatePublicSymbolStream(rawPdbFile);
         const PDB::ArrayView<PDB::HashRecord> hashRecords = publicSymbolStream.GetRecords();
-        const size_t count = hashRecords.GetLength();
-
         for (const PDB::HashRecord& hashRecord : hashRecords)
         {
             const PDB::CodeView::DBI::Record* record = publicSymbolStream.GetRecord(symbolRecordStream, hashRecord);
-            if ((PDB_AS_UNDERLYING(record->data.S_PUB32.flags) & PDB_AS_UNDERLYING(PDB::CodeView::DBI::PublicSymbolFlags::Function)) == 0u)
-            {
-                // ignore everything that is not a function
-                continue;
-            }
-
-            const uint32_t rva = imageSectionStream.ConvertSectionOffsetToRVA(record->data.S_PUB32.section, record->data.S_PUB32.offset);
-            if (rva == 0u)
-            {
-                // certain symbols (e.g. control-flow guard symbols) don't have a valid RVA, ignore those
-                continue;
-            }
-
-            // check whether we already know this symbol from one of the module streams
-            if (!seenRVAs.insert(rva).second)
-                continue; // already saw this RVA
-
-            //@TODO: demangle the name
-            AddSymbol(contributions.data(), contributions.size(), record->data.S_PUB32.section, record->data.S_PUB32.offset, record->data.S_PUB32.name, 0, rva, to);
+            ProcessSymbol(contributions.data(), contributions.size(), imageSectionStream, record, to, seenRVAs);
         }
     }
+    */
 }
 
 // check whether the DBI stream offers all sub-streams we need
@@ -308,6 +305,15 @@ bool ReadDebugInfo(const char *fileName, DebugInfo &to)
     {
         fprintf(stderr, "  PDB file '%s' does not have required DBI sections\n", fileName);
         return false;
+    }
+
+    if (dbiStream.GetHeader().flags & 0x1)
+    {
+        printf("Warning: PDB file is created with incremental linking, some information might be misleading.\n");
+    }
+    if (dbiStream.GetHeader().flags & 0x2)
+    {
+        printf("Warning: PDB file is stripped, some information might be missing or misleading.\n");
     }
 
     ReadEverything(rawPdbFile, dbiStream, to);
