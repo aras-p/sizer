@@ -1,5 +1,5 @@
 // Executable size report utility.
-// Aras Pranckevicius, http://aras-p.info/projSizer.html
+// Aras Pranckevicius, https://aras-p.info/projSizer.html
 // Based on code by Fabian "ryg" Giesen, http://farbrausch.com/~fg/
 // Public domain.
 
@@ -11,32 +11,27 @@
 
 /****************************************************************************/
 
-sU32 DebugInfo::CountSizeInClass(sInt type) const
+uint32_t DebugInfo::CountSizeInClass(int32_t type) const
 {
-    sU32 size = 0;
-    for (sInt i = 0; i < Symbols.size(); i++)
+    uint32_t size = 0;
+    for (int32_t i = 0; i < Symbols.size(); i++)
         size += (Symbols[i].Class == type) ? Symbols[i].Size : 0;
 
     return size;
 }
 
-void DebugInfo::Init()
+int32_t DebugInfo::MakeStringPtr(const char *s)
 {
-    BaseAddress = 0;
+    return MakeStringStd(std::string(s));
 }
 
-void DebugInfo::Exit()
+int32_t DebugInfo::MakeStringStd(const std::string& str)
 {
-}
-
-sInt DebugInfo::MakeString(sChar *s)
-{
-    string str(s);
     IndexByStringMap::iterator it = m_IndexByString.find(str);
     if (it != m_IndexByString.end())
         return it->second;
 
-    sInt index = m_IndexByString.size();
+    int32_t index = m_IndexByString.size();
     m_IndexByString.insert(std::make_pair(str, index));
     m_StringByIndex.push_back(str);
     return index;
@@ -87,11 +82,11 @@ void DebugInfo::FinishedReading()
     typedef std::map<std::string, int> StringIntMap;
     StringIntMap templateToIndex;
 
-    for (sInt i = 0; i < Symbols.size(); i++)
+    for (int32_t i = 0; i < Symbols.size(); i++)
     {
         DISymbol *sym = &Symbols[i];
 
-        std::string templateName = GetStringPrep(sym->name);
+        std::string templateName = sym->name;
         bool isTemplate = StripTemplateParams(templateName);
         if (isTemplate)
         {
@@ -109,8 +104,6 @@ void DebugInfo::FinishedReading()
                 templateToIndex.insert(std::make_pair(templateName, index));
                 TemplateSymbol tsym;
                 tsym.name = templateName;
-                tsym.mangledName = GetStringPrep(sym->mangledName);
-                StripTemplateParams(tsym.mangledName);
                 tsym.count = 1;
                 tsym.size = sym->Size;
                 Templates.push_back(tsym);
@@ -120,52 +113,11 @@ void DebugInfo::FinishedReading()
 
     // sort symbols by virtual address
     std::sort(Symbols.begin(), Symbols.end(), virtAddressComp);
-
-    // remove address double-covers
-    sInt symCount = Symbols.size();
-    DISymbol *syms = new DISymbol[symCount];
-    sCopyMem(syms, &Symbols[0], symCount * sizeof(DISymbol));
-
-    Symbols.clear();
-    sU32 oldVA = 0;
-    sInt oldSize = 0;
-
-    for (sInt i = 0; i < symCount; i++)
-    {
-        DISymbol *in = &syms[i];
-        sU32 newVA = in->VA;
-        sU32 newSize = in->Size;
-
-        if (oldVA != 0)
-        {
-            sInt adjust = newVA - oldVA;
-            if (adjust < 0) // we have to shorten
-            {
-                newVA = oldVA;
-                if (newSize >= -adjust)
-                    newSize += adjust;
-            }
-        }
-
-        if (newSize || in->Class == DIC_END)
-        {
-            Symbols.push_back(DISymbol());
-            DISymbol *out = &Symbols.back();
-            *out = *in;
-            out->VA = newVA;
-            out->Size = newSize;
-
-            oldVA = newVA + newSize;
-            oldSize = newSize;
-        }
-    }
-
-    delete[] syms;
 }
 
-sInt DebugInfo::GetFile(sInt fileName)
+int32_t DebugInfo::GetFile(int32_t fileName)
 {
-    for (sInt i = 0; i < m_Files.size(); i++)
+    for (int32_t i = 0; i < m_Files.size(); i++)
         if (m_Files[i].fileName == fileName)
             return i;
 
@@ -177,65 +129,67 @@ sInt DebugInfo::GetFile(sInt fileName)
     return m_Files.size() - 1;
 }
 
-sInt DebugInfo::GetFileByName(sChar *objName)
+int32_t DebugInfo::GetFileByName(const char *objName)
 {
-    sChar *p;
+    char *p;
 
     // skip path seperators
-    while ((p = (sChar*)sFindString(objName, "\\")))
+    while ((p = (char*)strchr(objName, '\\')))
         objName = p + 1;
 
-    while ((p = (sChar*)sFindString(objName, "/")))
+    while ((p = (char*)strchr(objName, '/')))
         objName = p + 1;
 
-    return GetFile(MakeString(objName));
+    return GetFile(MakeStringPtr(objName));
 }
 
-sInt DebugInfo::GetNameSpace(sInt name)
+int32_t DebugInfo::GetNameSpace(int32_t name)
 {
-    for (sInt i = 0; i < NameSps.size(); i++)
-        if (NameSps[i].name == name)
-            return i;
+    const auto it = m_NameSpaceIndexByName.find(name);
+    if (it != m_NameSpaceIndexByName.end())
+        return it->second;
 
     DISymNameSp namesp;
     namesp.name = name;
     namesp.codeSize = namesp.dataSize = 0;
     NameSps.push_back(namesp);
 
-    return NameSps.size() - 1;
+    int32_t index = NameSps.size() - 1;
+    m_NameSpaceIndexByName.insert({name, index});
+    return index;
 }
 
-sInt DebugInfo::GetNameSpaceByName(sChar *name)
+int32_t DebugInfo::GetNameSpaceByName(const char *name)
 {
-    sChar *pp = name - 2;
-    sChar *p;
-    sInt cname;
+    const char *pp = name - 2;
+    char *p;
+    int32_t cname;
 
-    while ((p = (sChar*)sFindString(pp + 2, "::")))
+    while ((p = (char*)strstr(pp + 2, "::")))
         pp = p;
 
-    while ((p = (sChar*)sFindString(pp + 1, ".")))
+    while ((p = (char*)strchr(pp + 1, '.')))
         pp = p;
 
     if (pp != name - 2)
     {
-        sChar buffer[2048];
+        char buffer[2048];
         sCopyString(buffer, sizeof(buffer), name, 2048 - 1);
 
         if (pp - name < 2048)
             buffer[pp - name] = 0;
 
-        cname = MakeString(buffer);
+        cname = MakeStringPtr(buffer);
     }
     else
-        cname = MakeString("<global>");
+        cname = MakeStringPtr("<global>");
 
     return GetNameSpace(cname);
 }
 
 void DebugInfo::StartAnalyze()
 {
-    sInt i;
+    int32_t i;
 
     for (i = 0; i < m_Files.size(); i++)
     {
@@ -250,7 +204,7 @@ void DebugInfo::StartAnalyze()
 
 void DebugInfo::FinishAnalyze()
 {
-    sInt i;
+    int32_t i;
 
     for (i = 0; i < Symbols.size(); i++)
     {
@@ -267,9 +221,9 @@ void DebugInfo::FinishAnalyze()
     }
 }
 
-sBool DebugInfo::FindSymbol(sU32 VA, DISymbol **sym)
+bool DebugInfo::FindSymbol(uint32_t VA, DISymbol **sym)
 {
-    sInt l, r, x;
+    int32_t l, r, x;
 
     l = 0;
     r = Symbols.size();
@@ -294,22 +248,32 @@ sBool DebugInfo::FindSymbol(sU32 VA, DISymbol **sym)
 
 static bool symSizeComp(const DISymbol &a, const DISymbol &b)
 {
-    return a.Size > b.Size;
+    if (a.Size != b.Size)
+        return a.Size > b.Size;
+    return a.VA < b.VA;
 }
 
 static bool templateSizeComp(const TemplateSymbol& a, const TemplateSymbol& b)
 {
-    return a.size > b.size;
+    if (a.size != b.size)
+        return a.size > b.size;
+    if (a.count != b.count)
+        return a.count > b.count;
+    return a.name.length() < b.name.length();
 }
 
 static bool nameCodeSizeComp(const DISymNameSp &a, const DISymNameSp &b)
 {
-    return a.codeSize > b.codeSize;
+    if (a.codeSize != b.codeSize)
+        return a.codeSize > b.codeSize;
+    return a.dataSize > b.dataSize;
 }
 
 static bool fileCodeSizeComp(const DISymFile &a, const DISymFile &b)
 {
-    return a.codeSize > b.codeSize;
+    if (a.codeSize != b.codeSize)
+        return a.codeSize > b.codeSize;
+    return a.dataSize > b.dataSize;
 }
 
 static void sAppendPrintF(std::string &str, const char *format, ...)
@@ -329,8 +293,8 @@ static void sAppendPrintF(std::string &str, const char *format, ...)
 std::string DebugInfo::WriteReport(const DebugFilters& filters)
 {
     std::string Report;
-    sInt i; //,j;
-    sU32 size;
+    int32_t i; //,j;
+    uint32_t size;
     const char* filterName = filters.name.empty() ? NULL : filters.name.c_str();
 
     Report.reserve(16384); // start out with 16k space
@@ -349,14 +313,13 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
             break;
         if (Symbols[i].Class == DIC_CODE)
         {
-            const char* name1 = GetStringPrep(Symbols[i].mangledName);
+            const char* name1 = Symbols[i].name.c_str();
             const char* name2 = GetStringPrep(m_Files[Symbols[i].objFileNum].fileName);
-            const char* name3 = GetStringPrep(Symbols[i].name);
-            if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName) && !strstr(name3, filterName))
+            if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
                 continue;
-            sAppendPrintF(Report, "%5d.%02d: %-80s %-40s %s\n",
+            sAppendPrintF(Report, "%5d.%02d: %-80s %s\n",
                 Symbols[i].Size / 1024, (Symbols[i].Size % 1024) * 100 / 1024,
-                name1, name2, name3);
+                name1, name2);
         }
     }
 
@@ -371,15 +334,13 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
             break;
         if (Templates[i].count < filters.minTemplateCount)
             continue;
-        const char* name1 = Templates[i].mangledName.c_str();
-        const char* name2 = Templates[i].name.c_str();
-        if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
+        const char* name1 = Templates[i].name.c_str();
+        if (filterName && !strstr(name1, filterName))
             continue;
-        sAppendPrintF(Report, "%5d.%02d #%5d: %-80s %s\n",
+        sAppendPrintF(Report, "%5d.%02d #%5d: %s\n",
             Templates[i].size / 1024, (Templates[i].size % 1024) * 100 / 1024,
             Templates[i].count,
-            name1,
-            name2);
+            name1);
     }
 
     sAppendPrintF(Report, "\nData by size (kilobytes, min %.2f):\n", filters.minData/1024.0);
@@ -389,7 +350,7 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
             break;
         if (Symbols[i].Class == DIC_DATA)
         {
-            const char* name1 = GetStringPrep(Symbols[i].name);
+            const char* name1 = Symbols[i].name.c_str();
             const char* name2 = GetStringPrep(m_Files[Symbols[i].objFileNum].fileName);
             if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
                 continue;
@@ -406,7 +367,7 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
             break;
         if (Symbols[i].Class == DIC_BSS)
         {
-            const char* name1 = GetStringPrep(Symbols[i].name);
+            const char* name1 = Symbols[i].name.c_str();
             const char* name2 = GetStringPrep(m_Files[Symbols[i].objFileNum].fileName);
             if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
                 continue;
@@ -417,28 +378,28 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
     }
 
     /*
-    sSPrintF(Report,512,"\nFunctions by object file and size:\n");
-    Report += sGetStringLen(Report);
+    _snprintf(Report,512,"\nFunctions by object file and size:\n");
+    Report += strlen(Report);
 
     for(i=1;i<Symbols.size();i++)
       for(j=i;j>0;j--)
       {
-        sInt f1 = Symbols[j].FileNum;
-        sInt f2 = Symbols[j-1].FileNum;
+        int32_t f1 = Symbols[j].FileNum;
+        int32_t f2 = Symbols[j-1].FileNum;
 
-        if(f1 == -1 || f2 != -1 && sCmpStringI(Files[f1].Name.String,Files[f2].Name.String) < 0)
-          sSwap(Symbols[j],Symbols[j-1]);
+        if(f1 == -1 || f2 != -1 && stricmp(Files[f1].Name.String,Files[f2].Name.String) < 0)
+          std::swap(Symbols[j],Symbols[j-1]);
       }
 
     for(i=0;i<Symbols.size();i++)
     {
       if(Symbols[i].Class == DIC_CODE)
       {
-        sSPrintF(Report,512,"%5d.%02d: %-50s %s\n",
+        _snprintf(Report,512,"%5d.%02d: %-50s %s\n",
           Symbols[i].Size/1024,(Symbols[i].Size%1024)*100/1024,
           Symbols[i].Name,Files[Symbols[i].FileNum].Name);
 
-        Report += sGetStringLen(Report);
+        Report += strlen(Report);
       }
     }
     */

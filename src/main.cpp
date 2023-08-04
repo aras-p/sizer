@@ -1,9 +1,12 @@
 // Executable size report utility.
-// Aras Pranckevicius, http://aras-p.info/projSizer.html
+// Aras Pranckevicius, https://aras-p.info/projSizer.html
 // Based on code by Fabian "ryg" Giesen, http://farbrausch.com/~fg/
 // Public domain.
 
 #include "pdbfile.hpp"
+#include "debuginfo.hpp"
+#include "pe_utils.hpp"
+#include "mmapfile.h"
 #include "parg.h"
 #include <cstdio>
 #include <ctime>
@@ -11,7 +14,7 @@
 static void print_help()
 {
     DebugFilters def;
-    fprintf(stderr, "Usage: Sizer [options] exefile\n");
+    fprintf(stderr, "Usage: Sizer [options] exe_or_pdb_file\n");
     fprintf(stderr, " -n str  or --name=str           Only include things containing 'str' into report\n");
     fprintf(stderr, " -a size or --all                Include all symbols, same as --min=0\n");
     fprintf(stderr, " -m size or --min=size           Minimum size for anything to be reported (default varies, see below)\n");
@@ -78,6 +81,12 @@ static bool parse_cmdline(int argc,char * const * argv, DebugFilters& outFilters
     return true;
 }
 
+static bool ends_with(std::string const& value, std::string const& ending)
+{
+    if (ending.size() > value.size()) return false;
+    return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
+}
+
 int main(int argc, char * const * argv)
 {
     DebugFilters filters;
@@ -91,10 +100,22 @@ int main(int argc, char * const * argv)
 
     clock_t time1 = clock();
 
-    info.Init();
-    PDBFileReader pdb;
+    if (ends_with(file, ".exe") || ends_with(file, ".dll") || ends_with(file, ".EXE") || ends_with(file, ".DLL"))
+    {
+        fprintf(stderr, "Finding debug location for %s ...\n", file.c_str());
+        MemoryMappedFile exeFile(file.c_str());
+        if (exeFile.baseAddress == nullptr)
+        {
+            fprintf(stderr, "ERROR: failed to memory-map file '%s'\n", file.c_str());
+            return 1;
+        }
+        std::string pdbPath = PEGetPDBPath(exeFile.baseAddress, exeFile.fileSize);
+        if (!pdbPath.empty())
+            file = pdbPath;
+    }
+
     fprintf(stderr, "Reading debug info for %s ...\n", file.c_str());
-    bool pdbok = pdb.ReadDebugInfo(file.c_str(), info);
+    bool pdbok = ReadDebugInfo(file.c_str(), info);
     if (!pdbok)
     {
         fprintf(stderr, "ERROR reading file via PDB\n");

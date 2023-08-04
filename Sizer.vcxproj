@@ -95,13 +95,63 @@
   <ItemGroup>
     <ClCompile Include="src\debuginfo.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\mmapfile.cpp" />
     <ClCompile Include="src\parg.c" />
     <ClCompile Include="src\pdbfile.cpp" />
+    <ClCompile Include="src\pdb_typetable.cpp" />
+    <ClCompile Include="src\pe_utils.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_CoalescedMSFStream.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_DBIStream.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_DBITypes.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_DirectMSFStream.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_GlobalSymbolStream.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_ImageSectionStream.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_InfoStream.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_IPIStream.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_ModuleInfoStream.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_ModuleLineStream.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_ModuleSymbolStream.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_NamesStream.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_PCH.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_PublicSymbolStream.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_RawFile.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_SectionContributionStream.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_SourceFileStream.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_TPIStream.cpp" />
+    <ClCompile Include="src\raw_pdb\PDB_Types.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\debuginfo.hpp" />
+    <ClInclude Include="src\mmapfile.h" />
     <ClInclude Include="src\parg.h" />
     <ClInclude Include="src\pdbfile.hpp" />
+    <ClInclude Include="src\pdb_typetable.hpp" />
+    <ClInclude Include="src\pe_utils.hpp" />
+    <ClInclude Include="src\raw_pdb\PDB.h" />
+    <ClInclude Include="src\raw_pdb\PDB_CoalescedMSFStream.h" />
+    <ClInclude Include="src\raw_pdb\PDB_DBIStream.h" />
+    <ClInclude Include="src\raw_pdb\PDB_DBITypes.h" />
+    <ClInclude Include="src\raw_pdb\PDB_DirectMSFStream.h" />
+    <ClInclude Include="src\raw_pdb\PDB_ErrorCodes.h" />
+    <ClInclude Include="src\raw_pdb\PDB_GlobalSymbolStream.h" />
+    <ClInclude Include="src\raw_pdb\PDB_ImageSectionStream.h" />
+    <ClInclude Include="src\raw_pdb\PDB_InfoStream.h" />
+    <ClInclude Include="src\raw_pdb\PDB_IPIStream.h" />
+    <ClInclude Include="src\raw_pdb\PDB_IPITypes.h" />
+    <ClInclude Include="src\raw_pdb\PDB_ModuleInfoStream.h" />
+    <ClInclude Include="src\raw_pdb\PDB_ModuleLineStream.h" />
+    <ClInclude Include="src\raw_pdb\PDB_ModuleSymbolStream.h" />
+    <ClInclude Include="src\raw_pdb\PDB_NamesStream.h" />
+    <ClInclude Include="src\raw_pdb\PDB_PCH.h" />
+    <ClInclude Include="src\raw_pdb\PDB_PublicSymbolStream.h" />
+    <ClInclude Include="src\raw_pdb\PDB_RawFile.h" />
+    <ClInclude Include="src\raw_pdb\PDB_SectionContributionStream.h" />
+    <ClInclude Include="src\raw_pdb\PDB_SourceFileStream.h" />
+    <ClInclude Include="src\raw_pdb\PDB_TPIStream.h" />
+    <ClInclude Include="src\raw_pdb\PDB_TPITypes.h" />
+    <ClInclude Include="src\raw_pdb\PDB_Types.h" />
+    <ClInclude Include="src\raw_pdb\PDB_Util.h" />
     <ClInclude Include="src\types.hpp" />
   </ItemGroup>
   <ItemGroup>

@@ -1,3 +1,22 @@
+### 0.5.0, 2023 Aug 4
+
+Large speedup and removed dependency on `msdia*.dll`, by switching to [MolecularMatters/raw_pdb](https://github.com/MolecularMatters/raw_pdb)
+library for PDB file parsing. Sizer no longer uses MS DIA SDK, so maybe someday it will be able to run on Mac or Linux too!
+
+The speedup example of analyzing current Blender build: time goes from 9.6sec down to 2.1sec (only some of that is raw_pdb library
+being faster, other speedups are within Sizer itself).
+
+Overall sensible things that were reported before still seem to be sensible, but some "strange" things have changed. For example, previous versions
+used to report a massive `.text$mn` function attributed to one object file; that no longer happens. Previous versions used to *not* report
+some functions coming from linked static libraries, depending on how these were built.
+
+- Sizer no longer uses MS DIA SDK, and thus no longer needs `msdia_*.dll` being present anywhere.
+- Generally much faster now (4x-20x faster in my tests).
+- Command line accepts either executable/dll (as before), or directly path to PDB file.
+- Change: some "strange" functions (e.g. massive `.text$mn`) are no longer reported.
+- Fix: previously some symbols from linked static libraries were not included, depending on how the libraries are built and how their debug symbols are being generated.
+- Emits warning when analyzing a partially stripped (`/PDBSTRIPPED`) debug information.
+
 ### 0.4.0, 2023 Aug 2
 
 - Sizer itself is now 64 bit executable (aras)
