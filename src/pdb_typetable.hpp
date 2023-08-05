@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <stddef.h>
 #include "raw_pdb/PDB_TPIStream.h"
 #include "raw_pdb/PDB_CoalescedMSFStream.h"
 

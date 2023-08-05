@@ -174,7 +174,7 @@ int32_t DebugInfo::GetNameSpaceByName(const char *name)
     if (pp != name - 2)
     {
         char buffer[2048];
-        sCopyString(buffer, sizeof(buffer), name, 2048 - 1);
+        strncpy(buffer, name, sizeof(buffer)-1);
 
         if (pp - name < 2048)
             buffer[pp - name] = 0;
@@ -283,7 +283,7 @@ static void sAppendPrintF(std::string &str, const char *format, ...)
     va_list arg;
 
     va_start(arg, format);
-    _vsnprintf(buffer, bufferSize - 1, format, arg);
+    vsnprintf(buffer, bufferSize - 1, format, arg);
     va_end(arg);
 
     strcpy(&buffer[bufferSize - 5], "...\n");
