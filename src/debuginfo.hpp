@@ -3,18 +3,19 @@
 // Based on code by Fabian "ryg" Giesen, http://farbrausch.com/~fg/
 // Public domain.
 
-#ifndef __DEBUGINFO_HPP__
-#define __DEBUGINFO_HPP__
+#pragma once
 
 #include <map>
 #include <string>
 #include <vector>
 
-#define DIC_END     0
-#define DIC_CODE    1
-#define DIC_DATA    2
-#define DIC_BSS     3 // uninitialized data
-#define DIC_UNKNOWN 4
+enum class SectionType
+{
+    Unknown,
+    Code,
+    Data,
+    BSS,
+};
 
 struct DISymFile // File
 {
@@ -25,26 +26,26 @@ struct DISymFile // File
 
 struct DISymNameSp // Namespace
 {
-    int32_t  name;
-    uint32_t  codeSize;
-    uint32_t  dataSize;
+    int32_t  name = 0;
+    uint32_t  codeSize = 0;
+    uint32_t  dataSize = 0;
 };
 
 struct DISymbol
 {
     std::string name;
-    int32_t NameSpNum;
-    int32_t objFileNum;
-    uint32_t VA;
-    uint32_t Size;
-    int32_t Class;
+    int32_t NameSpNum = 0;
+    int32_t objFileNum = 0;
+    uint32_t VA = 0;
+    uint32_t Size = 0;
+    SectionType sectionType = SectionType::Unknown;
 };
 
 struct TemplateSymbol
 {
     std::string name;
-    uint32_t size;
-    uint32_t count;
+    uint32_t size = 0;
+    uint32_t count = 0;
 };
 
 struct DebugFilters
@@ -73,7 +74,7 @@ class DebugInfo
     IndexByStringMap  m_IndexByString;
     NameIndexToArrayIndexMap m_NameSpaceIndexByName;
 
-    uint32_t CountSizeInClass(int32_t type) const;
+    uint32_t CountSizeInSection(SectionType type) const;
 
 public:
     std::vector<DISymbol>  Symbols;
@@ -98,12 +99,3 @@ public:
 
     std::string WriteReport(const DebugFilters& filters);
 };
-
-class DebugInfoReader
-{
-public:
-    virtual bool ReadDebugInfo(const char *fileName, DebugInfo &to) = 0;
-};
-
-
-#endif

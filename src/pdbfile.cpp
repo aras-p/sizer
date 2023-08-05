@@ -24,7 +24,7 @@ struct SectionContrib
     uint32_t Offset;
     uint32_t Length;
     uint32_t Compiland;
-    int32_t Type;
+    SectionType Type;
     int32_t ObjFile;
 };
 
@@ -72,7 +72,7 @@ static void AddSymbol(const SectionContrib* contribs, size_t contribsCount, uint
 {
     const SectionContrib* contrib = ContribFromSectionOffset(contribs, contribsCount, section, offset);
     int32_t objFile = 0;
-    int32_t sectionType = DIC_UNKNOWN;
+    SectionType sectionType = SectionType::Unknown;
     if (contrib)
     {
         objFile = contrib->ObjFile;
@@ -82,13 +82,11 @@ static void AddSymbol(const SectionContrib* contribs, size_t contribsCount, uint
     }
 
     DISymbol outSym;
-
-    to.Symbols.push_back(DISymbol());
     outSym.name = name.empty() ? "<noname>" : name;
     outSym.objFileNum = objFile;
     outSym.VA = rva;
     outSym.Size = length;
-    outSym.Class = sectionType;
+    outSym.sectionType = sectionType;
     outSym.NameSpNum = to.GetNameSpaceByName(name.c_str());
 
     to.Symbols.emplace_back(outSym);
@@ -221,13 +219,13 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
         bool hasInitData = srcContrib.characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA;
         bool hasUninitData = srcContrib.characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA;
         if (hasCode && !hasInitData && !hasUninitData)
-            contrib.Type = DIC_CODE;
+            contrib.Type = SectionType::Code;
         else if (!hasCode && hasInitData && !hasUninitData)
-            contrib.Type = DIC_DATA;
+            contrib.Type = SectionType::Data;
         else if (!hasCode && !hasInitData && hasUninitData)
-            contrib.Type = DIC_BSS;
+            contrib.Type = SectionType::BSS;
         else
-            contrib.Type = DIC_UNKNOWN;
+            contrib.Type = SectionType::Unknown;
 
         const PDB::ModuleInfoStream::Module& module = moduleInfoStream.GetModule(srcContrib.moduleIndex);
         contrib.ObjFile = to.GetFileByName(module.GetName().Decay());
