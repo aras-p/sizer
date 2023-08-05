@@ -40,21 +40,21 @@ struct PDBSymbol
 };
 
 
-static const SectionContrib* ContribFromSectionOffset(const SectionContrib* contribs, int contribsCount, uint32_t sec, uint32_t offs)
+static const SectionContrib* ContribFromSectionOffset(const SectionContrib* contribs, size_t contribsCount, uint32_t sec, uint32_t offs)
 {
     int32_t l, r, x;
 
     l = 0;
-    r = contribsCount;
+    r = int32_t(contribsCount);
 
     while (l < r)
     {
         x = (l + r) / 2;
         const SectionContrib &cur = contribs[x];
 
-        if (sec < cur.Section || sec == cur.Section && offs < cur.Offset)
+        if (sec < cur.Section || (sec == cur.Section && offs < cur.Offset))
             r = x;
-        else if (sec > cur.Section || sec == cur.Section && offs >= cur.Offset + cur.Length)
+        else if (sec > cur.Section || (sec == cur.Section && offs >= cur.Offset + cur.Length))
             l = x + 1;
         else if (sec == cur.Section && offs >= cur.Offset && offs < cur.Offset + cur.Length) // we got a winner
             return &cur;
@@ -69,7 +69,7 @@ static const SectionContrib* ContribFromSectionOffset(const SectionContrib* cont
 typedef std::unordered_map<uint32_t, PDBSymbol> RVAToSymbolMap;
 
 
-static void AddSymbol(const SectionContrib* contribs, int contribsCount, uint32_t section, uint32_t offset, const std::string& name, uint32_t length, uint32_t rva, DebugInfo& to)
+static void AddSymbol(const SectionContrib* contribs, size_t contribsCount, uint32_t section, uint32_t offset, const std::string& name, uint32_t length, uint32_t rva, DebugInfo& to)
 {
     const SectionContrib* contrib = ContribFromSectionOffset(contribs, contribsCount, section, offset);
     int32_t objFile = 0;
@@ -318,7 +318,7 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
                     typeSizeCache.insert({curr.typeIndex, typeSize});
                 }
                 if (typeSize != 0)
-                    curr.length = typeSize;
+                    curr.length = uint32_t(typeSize);
             }
 
             // Contribution:

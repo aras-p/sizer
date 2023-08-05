@@ -31,7 +31,7 @@ int32_t DebugInfo::MakeStringStd(const std::string& str)
     if (it != m_IndexByString.end())
         return it->second;
 
-    int32_t index = m_IndexByString.size();
+    int32_t index = int32_t(m_IndexByString.size());
     m_IndexByString.insert(std::make_pair(str, index));
     m_StringByIndex.push_back(str);
     return index;
@@ -45,12 +45,12 @@ bool virtAddressComp(const DISymbol &a, const DISymbol &b)
 static bool StripTemplateParams(std::string& str)
 {
     bool isTemplate = false;
-    int start = str.find('<', 0);
+    size_t start = str.find('<', 0);
     while (start != std::string::npos)
     {
         isTemplate = true;
         // scan to matching closing '>'
-        int i = start + 1;
+        size_t i = start + 1;
         int depth = 1;
         while (i < str.size())
         {
@@ -100,7 +100,7 @@ void DebugInfo::FinishedReading()
             }
             else
             {
-                index = Templates.size();
+                index = int(Templates.size());
                 templateToIndex.insert(std::make_pair(templateName, index));
                 TemplateSymbol tsym;
                 tsym.name = templateName;
@@ -126,7 +126,7 @@ int32_t DebugInfo::GetFile(int32_t fileName)
     file->fileName = fileName;
     file->codeSize = file->dataSize = 0;
 
-    return m_Files.size() - 1;
+    return int32_t(m_Files.size() - 1);
 }
 
 int32_t DebugInfo::GetFileByName(const char *objName)
@@ -154,7 +154,7 @@ int32_t DebugInfo::GetNameSpace(int32_t name)
     namesp.codeSize = namesp.dataSize = 0;
     NameSps.push_back(namesp);
 
-    int32_t index = NameSps.size() - 1;
+    int32_t index = int32_t(NameSps.size() - 1);
     m_NameSpaceIndexByName.insert({name, index});
     return index;
 }
@@ -219,31 +219,6 @@ void DebugInfo::FinishAnalyze()
             NameSps[Symbols[i].NameSpNum].dataSize += Symbols[i].Size;
         }
     }
-}
-
-bool DebugInfo::FindSymbol(uint32_t VA, DISymbol **sym)
-{
-    int32_t l, r, x;
-
-    l = 0;
-    r = Symbols.size();
-    while (l < r)
-    {
-        x = (l + r) / 2;
-
-        if (VA < Symbols[x].VA)
-            r = x; // continue in left half
-        else if (VA >= Symbols[x].VA + Symbols[x].Size)
-            l = x + 1; // continue in left half
-        else
-        {
-            *sym = &Symbols[x]; // we found a match
-            return true;
-        }
-    }
-
-    *sym = (l + 1 < Symbols.size()) ? &Symbols[l + 1] : 0;
-    return false;
 }
 
 static bool symSizeComp(const DISymbol &a, const DISymbol &b)

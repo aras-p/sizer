@@ -70,7 +70,7 @@ class DebugInfo
 {
     typedef std::vector<string>   StringByIndexVector;
     typedef std::map<string, int32_t> IndexByStringMap;
-    typedef std::map<int32_t, size_t> NameIndexToArrayIndexMap;
+    typedef std::map<int32_t, int32_t> NameIndexToArrayIndexMap;
 
     StringByIndexVector m_StringByIndex;
     IndexByStringMap  m_IndexByString;
@@ -98,7 +98,6 @@ public:
 
     void StartAnalyze();
     void FinishAnalyze();
-    bool FindSymbol(uint32_t VA, DISymbol **sym);
 
     std::string WriteReport(const DebugFilters& filters);
 };
