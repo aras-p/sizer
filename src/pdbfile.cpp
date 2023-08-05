@@ -87,7 +87,7 @@ static void AddSymbol(const SectionContrib* contribs, size_t contribsCount, uint
     outSym.VA = rva;
     outSym.Size = length;
     outSym.sectionType = sectionType;
-    outSym.NameSpNum = to.GetNameSpaceByName(name.c_str());
+    outSym.namespaceIndex = to.GetNameSpaceIndex(name);
 
     to.Symbols.emplace_back(outSym);
 }
@@ -228,7 +228,7 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
             contrib.Type = SectionType::Unknown;
 
         const PDB::ModuleInfoStream::Module& module = moduleInfoStream.GetModule(srcContrib.moduleIndex);
-        contrib.ObjFileIndex = to.GetObjectFileIndexByPath(module.GetName().Decay());
+        contrib.ObjFileIndex = to.GetObjectFileIndex(module.GetName().Decay());
         contributions.emplace_back(contrib);
     }
 

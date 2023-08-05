@@ -20,23 +20,6 @@ uint32_t DebugInfo::CountSizeInSection(SectionType type) const
     return size;
 }
 
-int32_t DebugInfo::MakeStringPtr(const char *s)
-{
-    return MakeStringStd(std::string(s));
-}
-
-int32_t DebugInfo::MakeStringStd(const std::string& str)
-{
-    IndexByStringMap::iterator it = m_IndexByString.find(str);
-    if (it != m_IndexByString.end())
-        return it->second;
-
-    int32_t index = int32_t(m_IndexByString.size());
-    m_IndexByString.insert(std::make_pair(str, index));
-    m_StringByIndex.push_back(str);
-    return index;
-}
-
 bool virtAddressComp(const DISymbol &a, const DISymbol &b)
 {
     return a.VA < b.VA;
@@ -130,7 +113,7 @@ static void splitPath(const std::string& path, std::string& outDir, std::string&
     }
 }
 
-int32_t DebugInfo::GetObjectFileIndexByPath(const char* pathStr)
+int32_t DebugInfo::GetObjectFileIndex(const char* pathStr)
 {
     std::string path = pathStr;
     auto it = m_ObjectPathToIndex.find(path);
@@ -162,58 +145,28 @@ std::string DebugInfo::GetObjectFileDesc(int index) const
     return info.fileName + " (" + info.fileDir + ")";
 }
 
-int32_t DebugInfo::GetNameSpace(int32_t name)
+int32_t DebugInfo::GetNameSpaceIndex(const std::string& symName)
 {
-    const auto it = m_NameSpaceIndexByName.find(name);
-    if (it != m_NameSpaceIndexByName.end())
+    std::string space;
+    size_t pos = symName.rfind("::");
+    if (pos == std::string::npos || pos == 0)
+        space = "<global>";
+    else
+        space = symName.substr(0, pos);
+
+    const auto it = m_NamespaceToIndex.find(space);
+    if (it != m_NamespaceToIndex.end())
         return it->second;
 
-    DISymNameSp namesp;
-    namesp.name = name;
-    namesp.codeSize = namesp.dataSize = 0;
-    NameSps.push_back(namesp);
+    NamespaceInfo info;
+    info.name = space;
 
-    int32_t index = int32_t(NameSps.size() - 1);
-    m_NameSpaceIndexByName.insert({name, index});
+    int32_t index = int32_t(m_NamespaceToIndex.size());
+    info.index = index;
+
+    m_Namespaces.emplace_back(info);
+    m_NamespaceToIndex.insert(it, { space, index });
     return index;
-}
-
-int32_t DebugInfo::GetNameSpaceByName(const char *name)
-{
-    const char *pp = name - 2;
-    char *p;
-    int32_t cname;
-
-    while ((p = (char*)strstr(pp + 2, "::")))
-        pp = p;
-
-    while ((p = (char*)strchr(pp + 1, '.')))
-        pp = p;
-
-    if (pp != name - 2)
-    {
-        char buffer[2048];
-        strncpy(buffer, name, sizeof(buffer)-1);
-
-        if (pp - name < 2048)
-            buffer[pp - name] = 0;
-
-        cname = MakeStringPtr(buffer);
-    }
-    else
-        cname = MakeStringPtr("<global>");
-
-    return GetNameSpace(cname);
-}
-
-void DebugInfo::StartAnalyze()
-{
-    int32_t i;
-
-    for (i = 0; i < NameSps.size(); i++)
-    {
-        NameSps[i].codeSize = NameSps[i].dataSize = 0;
-    }
 }
 
 void DebugInfo::FinishAnalyze()
@@ -223,12 +176,12 @@ void DebugInfo::FinishAnalyze()
         if (sym.sectionType == SectionType::Code)
         {
             m_ObjectFiles[sym.objectFileIndex].codeSize += sym.Size;
-            NameSps[sym.NameSpNum].codeSize += sym.Size;
+            m_Namespaces[sym.namespaceIndex].codeSize += sym.Size;
         }
         else if (sym.sectionType == SectionType::Data)
         {
             m_ObjectFiles[sym.objectFileIndex].dataSize += sym.Size;
-            NameSps[sym.NameSpNum].dataSize += sym.Size;
+            m_Namespaces[sym.namespaceIndex].dataSize += sym.Size;
         }
     }
 }
@@ -247,13 +200,6 @@ static bool templateSizeComp(const TemplateSymbol& a, const TemplateSymbol& b)
     if (a.count != b.count)
         return a.count > b.count;
     return a.name.length() < b.name.length();
-}
-
-static bool nameCodeSizeComp(const DISymNameSp &a, const DISymNameSp &b)
-{
-    if (a.codeSize != b.codeSize)
-        return a.codeSize > b.codeSize;
-    return a.dataSize > b.dataSize;
 }
 
 static void sAppendPrintF(std::string &str, const char *format, ...)
@@ -385,17 +331,27 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
     */
 
     sAppendPrintF(Report, "\nClasses/Namespaces by code size (kilobytes, min %.2f):\n", filters.minClass/1024.0);
-    std::sort(NameSps.begin(), NameSps.end(), nameCodeSizeComp);
-
-    for (i = 0; i < NameSps.size(); i++)
+    std::vector<NamespaceInfo> nameSpaces;
+    for (const auto& n : m_Namespaces)
     {
-        if (NameSps[i].codeSize < filters.minClass)
-            break;
-        const char* name1 = GetStringPrep(NameSps[i].name);
-        if (filterName && !strstr(name1, filterName))
+        if (n.codeSize >= filters.minClass)
+            nameSpaces.push_back(n);
+    }
+    std::sort(nameSpaces.begin(), nameSpaces.end(), [](const auto& a, const auto& b)
+    {
+        if (a.codeSize != b.codeSize)
+            return a.codeSize > b.codeSize;
+        if (a.dataSize != b.dataSize)
+            return a.dataSize > b.dataSize;
+        return a.name < b.name;
+    });
+    for (const auto& n : nameSpaces)
+    {
+        const std::string& name = n.name;
+        if (filterName && !strstr(name.c_str(), filterName))
             continue;
         sAppendPrintF(Report, "%5d.%02d: %s\n",
-            NameSps[i].codeSize / 1024, (NameSps[i].codeSize % 1024) * 100 / 1024, name1);
+            n.codeSize / 1024, (n.codeSize % 1024) * 100 / 1024, name.c_str());
     }
 
     sAppendPrintF(Report, "\nObject files by code size (kilobytes, min %.2f):\n", filters.minFile/1024.0);

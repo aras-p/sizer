@@ -27,9 +27,10 @@ struct ObjectFileInfo
     uint32_t dataSize = 0;
 };
 
-struct DISymNameSp // Namespace
+struct NamespaceInfo
 {
-    int32_t  name = 0;
+    std::string name;
+    int32_t index = 0;
     uint32_t  codeSize = 0;
     uint32_t  dataSize = 0;
 };
@@ -37,7 +38,7 @@ struct DISymNameSp // Namespace
 struct DISymbol
 {
     std::string name;
-    int32_t NameSpNum = 0;
+    int32_t namespaceIndex = 0;
     int32_t objectFileIndex = 0;
     uint32_t VA = 0;
     uint32_t Size = 0;
@@ -72,20 +73,12 @@ class DebugInfo
 public:
     std::vector<DISymbol>  Symbols;
     std::vector<TemplateSymbol>  Templates;
-    std::vector<DISymNameSp> NameSps;
-
-    int32_t MakeStringPtr(const char *s);
-    int32_t MakeStringStd(const std::string& s);
-    const char* GetStringPrep(int32_t index) const { return m_StringByIndex[index].c_str(); }
 
     void FinishedReading();
 
-    int32_t GetObjectFileIndexByPath(const char* pathStr);
+    int32_t GetObjectFileIndex(const char* pathStr);
+    int32_t GetNameSpaceIndex(const std::string& symName);
 
-    int32_t GetNameSpace(int32_t name);
-    int32_t GetNameSpaceByName(const char *name);
-
-    void StartAnalyze();
     void FinishAnalyze();
 
     std::string WriteReport(const DebugFilters& filters);
@@ -95,13 +88,8 @@ private:
     std::string GetObjectFileDesc(int index) const;
 
 private:
-    typedef std::vector<std::string>   StringByIndexVector;
-    typedef std::map<std::string, int32_t> IndexByStringMap;
-    typedef std::map<int32_t, int32_t> NameIndexToArrayIndexMap;
-
-    StringByIndexVector m_StringByIndex;
-    IndexByStringMap  m_IndexByString;
-    NameIndexToArrayIndexMap m_NameSpaceIndexByName;
+    std::vector<NamespaceInfo> m_Namespaces;
+    std::map<std::string, int32_t> m_NamespaceToIndex;
 
     std::vector<ObjectFileInfo> m_ObjectFiles;
     std::map<std::string, int32_t> m_ObjectPathToIndex;
