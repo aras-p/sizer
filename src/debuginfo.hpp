@@ -6,6 +6,7 @@
 #pragma once
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -17,11 +18,13 @@ enum class SectionType
     BSS,
 };
 
-struct DISymFile // File
+struct ObjectFileInfo
 {
-    int32_t  fileName;
-    uint32_t  codeSize;
-    uint32_t  dataSize;
+    std::string fileDir;
+    std::string fileName;
+    int32_t index = 0;
+    uint32_t codeSize = 0;
+    uint32_t dataSize = 0;
 };
 
 struct DISymNameSp // Namespace
@@ -35,7 +38,7 @@ struct DISymbol
 {
     std::string name;
     int32_t NameSpNum = 0;
-    int32_t objFileNum = 0;
+    int32_t objectFileIndex = 0;
     uint32_t VA = 0;
     uint32_t Size = 0;
     SectionType sectionType = SectionType::Unknown;
@@ -66,20 +69,9 @@ struct DebugFilters
 
 class DebugInfo
 {
-    typedef std::vector<std::string>   StringByIndexVector;
-    typedef std::map<std::string, int32_t> IndexByStringMap;
-    typedef std::map<int32_t, int32_t> NameIndexToArrayIndexMap;
-
-    StringByIndexVector m_StringByIndex;
-    IndexByStringMap  m_IndexByString;
-    NameIndexToArrayIndexMap m_NameSpaceIndexByName;
-
-    uint32_t CountSizeInSection(SectionType type) const;
-
 public:
     std::vector<DISymbol>  Symbols;
     std::vector<TemplateSymbol>  Templates;
-    std::vector<DISymFile> m_Files;
     std::vector<DISymNameSp> NameSps;
 
     int32_t MakeStringPtr(const char *s);
@@ -88,8 +80,7 @@ public:
 
     void FinishedReading();
 
-    int32_t GetFile(int32_t fileName);
-    int32_t GetFileByName(const char *objName);
+    int32_t GetObjectFileIndexByPath(const char* pathStr);
 
     int32_t GetNameSpace(int32_t name);
     int32_t GetNameSpaceByName(const char *name);
@@ -98,4 +89,21 @@ public:
     void FinishAnalyze();
 
     std::string WriteReport(const DebugFilters& filters);
+
+private:
+    uint32_t CountSizeInSection(SectionType type) const;
+    std::string GetObjectFileDesc(int index) const;
+
+private:
+    typedef std::vector<std::string>   StringByIndexVector;
+    typedef std::map<std::string, int32_t> IndexByStringMap;
+    typedef std::map<int32_t, int32_t> NameIndexToArrayIndexMap;
+
+    StringByIndexVector m_StringByIndex;
+    IndexByStringMap  m_IndexByString;
+    NameIndexToArrayIndexMap m_NameSpaceIndexByName;
+
+    std::vector<ObjectFileInfo> m_ObjectFiles;
+    std::map<std::string, int32_t> m_ObjectPathToIndex;
+    std::map<std::string, std::set<std::string>> m_ObjectNameToFolders;
 };

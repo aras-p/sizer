@@ -25,7 +25,7 @@ struct SectionContrib
     uint32_t Length;
     uint32_t Compiland;
     SectionType Type;
-    int32_t ObjFile;
+    int32_t ObjFileIndex;
 };
 
 struct PDBSymbol
@@ -71,11 +71,11 @@ typedef std::unordered_map<uint32_t, PDBSymbol> RVAToSymbolMap;
 static void AddSymbol(const SectionContrib* contribs, size_t contribsCount, uint32_t section, uint32_t offset, const std::string& name, uint32_t length, uint32_t rva, DebugInfo& to)
 {
     const SectionContrib* contrib = ContribFromSectionOffset(contribs, contribsCount, section, offset);
-    int32_t objFile = 0;
+    int32_t objFileIndex = 0;
     SectionType sectionType = SectionType::Unknown;
     if (contrib)
     {
-        objFile = contrib->ObjFile;
+        objFileIndex = contrib->ObjFileIndex;
         sectionType = contrib->Type;
         if (length == 0)
             length = contrib->Length;
@@ -83,7 +83,7 @@ static void AddSymbol(const SectionContrib* contribs, size_t contribsCount, uint
 
     DISymbol outSym;
     outSym.name = name.empty() ? "<noname>" : name;
-    outSym.objFileNum = objFile;
+    outSym.objectFileIndex = objFileIndex;
     outSym.VA = rva;
     outSym.Size = length;
     outSym.sectionType = sectionType;
@@ -228,7 +228,7 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
             contrib.Type = SectionType::Unknown;
 
         const PDB::ModuleInfoStream::Module& module = moduleInfoStream.GetModule(srcContrib.moduleIndex);
-        contrib.ObjFile = to.GetFileByName(module.GetName().Decay());
+        contrib.ObjFileIndex = to.GetObjectFileIndexByPath(module.GetName().Decay());
         contributions.emplace_back(contrib);
     }
 
