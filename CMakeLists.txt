@@ -19,7 +19,6 @@ add_executable (Sizer
 	src/pdbfile.hpp
 	src/pe_utils.cpp
 	src/pe_utils.hpp
-	src/types.hpp
 
 	src/raw_pdb
 	src/raw_pdb/Foundation

@@ -1,3 +1,9 @@
+### 0.5.1, 2023 Aug 5
+
+- Sizer now builds on Windows, Mac and Linux. Note that it still only analyzes the *Windows* executables/PDBs, but can do that while running on Mac/Linux.
+- The build system was changed to CMake.
+- Github Actions was added, which also builds the Sizer executable across all of Windows/Mac/Linux platforms.
+
 ### 0.5.0, 2023 Aug 4
 
 Large speedup and removed dependency on `msdia*.dll`, by switching to [MolecularMatters/raw_pdb](https://github.com/MolecularMatters/raw_pdb)
