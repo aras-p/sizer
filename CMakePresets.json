@@ -4,7 +4,6 @@
     {
       "name": "all-base",
       "hidden": true,
-      "generator": "Ninja",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "installDir": "${sourceDir}/out/install/${presetName}"
     },
@@ -35,6 +34,17 @@
       "cacheVariables": {
         "CMAKE_OSX_DEPLOYMENT_TARGET": "10.14"
       }            
+    },    
+    {
+      "name": "linux-base",
+      "inherits": "all-base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/out/${presetName}",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
     },    
     {
       "name": "x64-debug",
@@ -69,8 +79,16 @@
       "displayName": "Mac Release",
       "inherits": "mac-base",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+        "CMAKE_BUILD_TYPE": "Release"
       }
-    }    
+    },
+    {
+      "name": "linux-release",
+      "displayName": "Linux Release",
+      "inherits": "linux-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
   ]
 }
