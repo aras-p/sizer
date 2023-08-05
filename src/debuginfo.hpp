@@ -6,12 +6,9 @@
 #ifndef __DEBUGINFO_HPP__
 #define __DEBUGINFO_HPP__
 
-#include "types.hpp"
 #include <map>
-
-using std::string;
-
-/****************************************************************************/
+#include <string>
+#include <vector>
 
 #define DIC_END     0
 #define DIC_CODE    1
@@ -68,8 +65,8 @@ struct DebugFilters
 
 class DebugInfo
 {
-    typedef std::vector<string>   StringByIndexVector;
-    typedef std::map<string, int32_t> IndexByStringMap;
+    typedef std::vector<std::string>   StringByIndexVector;
+    typedef std::map<std::string, int32_t> IndexByStringMap;
     typedef std::map<int32_t, int32_t> NameIndexToArrayIndexMap;
 
     StringByIndexVector m_StringByIndex;

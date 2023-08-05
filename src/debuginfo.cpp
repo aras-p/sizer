@@ -3,13 +3,11 @@
 // Based on code by Fabian "ryg" Giesen, http://farbrausch.com/~fg/
 // Public domain.
 
-#include "types.hpp"
 #include "debuginfo.hpp"
 #include <stdarg.h>
 #include <algorithm>
 #include <map>
-
-/****************************************************************************/
+#include <string.h>
 
 uint32_t DebugInfo::CountSizeInClass(int32_t type) const
 {
