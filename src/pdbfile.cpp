@@ -68,7 +68,7 @@ static const SectionContrib* ContribFromSectionOffset(const SectionContrib* cont
 typedef std::unordered_map<uint32_t, PDBSymbol> RVAToSymbolMap;
 
 
-static void AddSymbol(const SectionContrib* contribs, size_t contribsCount, uint32_t section, uint32_t offset, const std::string& name, uint32_t length, uint32_t rva, DebugInfo& to)
+static void AddSymbol(const SectionContrib* contribs, size_t contribsCount, uint32_t section, uint32_t offset, const std::string& name, uint32_t length, DebugInfo& to)
 {
     const SectionContrib* contrib = ContribFromSectionOffset(contribs, contribsCount, section, offset);
     int32_t objFileIndex = 0;
@@ -81,15 +81,14 @@ static void AddSymbol(const SectionContrib* contribs, size_t contribsCount, uint
             length = contrib->Length;
     }
 
-    DISymbol outSym;
+    SymbolInfo outSym;
     outSym.name = name.empty() ? "<noname>" : name;
     outSym.objectFileIndex = objFileIndex;
-    outSym.VA = rva;
-    outSym.Size = length;
+    outSym.size = length;
     outSym.sectionType = sectionType;
     outSym.namespaceIndex = to.GetNameSpaceIndex(name);
 
-    to.Symbols.emplace_back(outSym);
+    to.m_Symbols.emplace_back(outSym);
 }
 
 static void ProcessSymbol(const PDB::ImageSectionStream& imageSectionStream, const PDB::CodeView::DBI::Record* record, RVAToSymbolMap& toMap)
@@ -341,7 +340,7 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
         ++addedSymbolCount;
         if ((addedSymbolCount & 65535) == 0)
             fprintf(stderr, "\b\b\b\b\b\b\b\b[%5.1f%%]", 50.0 + addedSymbolCount * 50.0 / symbolCount);
-        AddSymbol(contributions.data(), contributions.size(), sym.section, sym.offset, sym.name, sym.length, sym.rva, to);
+        AddSymbol(contributions.data(), contributions.size(), sym.section, sym.offset, sym.name, sym.length, to);
     }
 }
 

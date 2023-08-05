@@ -18,6 +18,15 @@ enum class SectionType
     BSS,
 };
 
+struct SymbolInfo
+{
+    std::string name;
+    int32_t namespaceIndex = 0;
+    int32_t objectFileIndex = 0;
+    uint32_t size = 0;
+    SectionType sectionType = SectionType::Unknown;
+};
+
 struct ObjectFileInfo
 {
     std::string fileDir;
@@ -35,17 +44,7 @@ struct NamespaceInfo
     uint32_t  dataSize = 0;
 };
 
-struct DISymbol
-{
-    std::string name;
-    int32_t namespaceIndex = 0;
-    int32_t objectFileIndex = 0;
-    uint32_t VA = 0;
-    uint32_t Size = 0;
-    SectionType sectionType = SectionType::Unknown;
-};
-
-struct TemplateSymbol
+struct TemplateInfo
 {
     std::string name;
     uint32_t size = 0;
@@ -71,15 +70,12 @@ struct DebugFilters
 class DebugInfo
 {
 public:
-    std::vector<DISymbol>  Symbols;
-    std::vector<TemplateSymbol>  Templates;
-
-    void FinishedReading();
+    std::vector<SymbolInfo>  m_Symbols;
 
     int32_t GetObjectFileIndex(const char* pathStr);
     int32_t GetNameSpaceIndex(const std::string& symName);
 
-    void FinishAnalyze();
+    void ComputeDerivedData();
 
     std::string WriteReport(const DebugFilters& filters);
 
@@ -94,4 +90,6 @@ private:
     std::vector<ObjectFileInfo> m_ObjectFiles;
     std::map<std::string, int32_t> m_ObjectPathToIndex;
     std::map<std::string, std::set<std::string>> m_ObjectNameToFolders;
+
+    std::vector<TemplateInfo> m_Templates;
 };

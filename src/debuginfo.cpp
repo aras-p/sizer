@@ -12,10 +12,10 @@
 uint32_t DebugInfo::CountSizeInSection(SectionType type) const
 {
     uint32_t size = 0;
-    for (const auto& sym : Symbols)
+    for (const auto& sym : m_Symbols)
     {
         if (sym.sectionType == type)
-            size += sym.Size;
+            size += sym.size;
     }
     return size;
 }
@@ -54,38 +54,47 @@ static bool StripTemplateParams(std::string& str)
     return isTemplate;
 }
 
-void DebugInfo::FinishedReading()
+void DebugInfo::ComputeDerivedData()
 {
-    // fix strings and aggregate templates
-    typedef std::map<std::string, int> StringIntMap;
-    StringIntMap templateToIndex;
+    std::map<std::string, int> templateToIndex;
 
-    for (int32_t i = 0; i < Symbols.size(); i++)
+    for (const auto& sym : m_Symbols)
     {
-        DISymbol *sym = &Symbols[i];
-
-        std::string templateName = sym->name;
+        // aggregate templates
+        std::string templateName = sym.name;
         bool isTemplate = StripTemplateParams(templateName);
         if (isTemplate)
         {
-            StringIntMap::iterator it = templateToIndex.find(templateName);
+            auto it = templateToIndex.find(templateName);
             int index;
             if (it != templateToIndex.end())
             {
                 index = it->second;
-                Templates[index].size += sym->Size;
-                Templates[index].count++;
+                m_Templates[index].size += sym.size;
+                m_Templates[index].count++;
             }
             else
             {
-                index = int(Templates.size());
+                index = int(m_Templates.size());
                 templateToIndex.insert(std::make_pair(templateName, index));
-                TemplateSymbol tsym;
-                tsym.name = templateName;
-                tsym.count = 1;
-                tsym.size = sym->Size;
-                Templates.push_back(tsym);
+                TemplateInfo info;
+                info.name = templateName;
+                info.count = 1;
+                info.size = sym.size;
+                m_Templates.emplace_back(info);
             }
+        }
+
+        // aggregate object file / namespace sizes
+        if (sym.sectionType == SectionType::Code)
+        {
+            m_ObjectFiles[sym.objectFileIndex].codeSize += sym.size;
+            m_Namespaces[sym.namespaceIndex].codeSize += sym.size;
+        }
+        else if (sym.sectionType == SectionType::Data)
+        {
+            m_ObjectFiles[sym.objectFileIndex].dataSize += sym.size;
+            m_Namespaces[sym.namespaceIndex].dataSize += sym.size;
         }
     }
 }
@@ -161,23 +170,6 @@ int32_t DebugInfo::GetNameSpaceIndex(const std::string& symName)
     return index;
 }
 
-void DebugInfo::FinishAnalyze()
-{
-    for (const auto& sym : Symbols)
-    {
-        if (sym.sectionType == SectionType::Code)
-        {
-            m_ObjectFiles[sym.objectFileIndex].codeSize += sym.Size;
-            m_Namespaces[sym.namespaceIndex].codeSize += sym.Size;
-        }
-        else if (sym.sectionType == SectionType::Data)
-        {
-            m_ObjectFiles[sym.objectFileIndex].dataSize += sym.Size;
-            m_Namespaces[sym.namespaceIndex].dataSize += sym.Size;
-        }
-    }
-}
-
 static void sAppendPrintF(std::string &str, const char *format, ...)
 {
     static const int bufferSize = 512; // cut off after this
@@ -205,15 +197,17 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
 
     // symbols
     sAppendPrintF(Report, "Functions by size (kilobytes, min %.2f):\n", filters.minFunction/1024.0);
-    std::sort(Symbols.begin(), Symbols.end(), [](const auto& a, const auto& b) {
-        if (a.Size != b.Size)
-            return a.Size > b.Size;
-        return a.VA < b.VA;
+    std::sort(m_Symbols.begin(), m_Symbols.end(), [](const auto& a, const auto& b) {
+        if (a.size != b.size)
+            return a.size > b.size;
+        if (a.objectFileIndex != b.objectFileIndex)
+            return a.objectFileIndex < b.objectFileIndex;
+        return a.name < b.name;
     });
 
-    for (const auto& sym : Symbols)
+    for (const auto& sym : m_Symbols)
     {
-        if (sym.Size < filters.minFunction)
+        if (sym.size < filters.minFunction)
             break;
         if (sym.sectionType == SectionType::Code)
         {
@@ -222,7 +216,7 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
             if (filterName && !strstr(name1, filterName) && !strstr(objFile.c_str(), filterName))
                 continue;
             sAppendPrintF(Report, "%5d.%02d: %-80s %s\n",
-                sym.Size / 1024, (sym.Size % 1024) * 100 / 1024,
+                sym.size / 1024, (sym.size % 1024) * 100 / 1024,
                 name1, objFile.c_str());
         }
     }
@@ -230,7 +224,7 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
     // templates
     sAppendPrintF(Report, "\nAggregated templates by size (kilobytes, min %.2f / %i):\n", filters.minTemplate/1024.0, filters.minTemplateCount);
 
-    std::sort(Templates.begin(), Templates.end(), [](const auto& a, const auto& b) {
+    std::sort(m_Templates.begin(), m_Templates.end(), [](const auto& a, const auto& b) {
         if (a.size != b.size)
             return a.size > b.size;
         if (a.count != b.count)
@@ -238,7 +232,7 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
         return a.name < b.name;
     });
 
-    for (const auto& tpl : Templates)
+    for (const auto& tpl : m_Templates)
     {
         if (tpl.size < filters.minTemplate)
             break;
@@ -254,9 +248,9 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
     }
 
     sAppendPrintF(Report, "\nData by size (kilobytes, min %.2f):\n", filters.minData/1024.0);
-    for (const auto& sym : Symbols)
+    for (const auto& sym : m_Symbols)
     {
-        if (sym.Size < filters.minData)
+        if (sym.size < filters.minData)
             break;
         if (sym.sectionType == SectionType::Data)
         {
@@ -265,15 +259,15 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
             if (filterName && !strstr(name1, filterName) && !strstr(objFile.c_str(), filterName))
                 continue;
             sAppendPrintF(Report, "%5d.%02d: %-50s %s\n",
-                sym.Size / 1024, (sym.Size % 1024) * 100 / 1024,
+                sym.size / 1024, (sym.size % 1024) * 100 / 1024,
                 name1, objFile.c_str());
         }
     }
 
     sAppendPrintF(Report, "\nBSS by size (kilobytes, min %.2f):\n", filters.minData/1024.0);
-    for (const auto& sym : Symbols)
+    for (const auto& sym : m_Symbols)
     {
-        if (sym.Size < filters.minData)
+        if (sym.size < filters.minData)
             break;
         if (sym.sectionType == SectionType::BSS)
         {
@@ -282,7 +276,7 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
             if (filterName && !strstr(name1, filterName) && !strstr(objFile.c_str(), filterName))
                 continue;
             sAppendPrintF(Report, "%5d.%02d: %-50s %s\n",
-                sym.Size / 1024, (sym.Size % 1024) * 100 / 1024,
+                sym.size / 1024, (sym.size % 1024) * 100 / 1024,
                 name1, objFile.c_str());
         }
     }
