@@ -26,7 +26,6 @@
       "name": "mac-base",
       "inherits": "all-base",
       "hidden": true,
-      "generator": "Xcode",
       "binaryDir": "${sourceDir}/out/${presetName}",
       "condition": {
         "type": "equals",

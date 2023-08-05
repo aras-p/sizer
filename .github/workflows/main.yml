@@ -1,0 +1,63 @@
+name: build
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-2019
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v1
+    - name: Windows VS2019
+      run: |
+        cmake -S . --preset=x64-release
+        cmake --build out/x64-release
+        out/x64-release/Sizer
+      shell: cmd
+    - uses: actions/upload-artifact@v1
+      with:
+        name: Sizer.exe
+        path: out/x64-release/Sizer.exe
+
+  mac:
+    runs-on: macOS-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v1
+    - name: macOS Xcode 14
+      run: |
+        cmake -S . --preset=mac-release
+        cmake --build out/mac-release
+        out/mac-release/Sizer
+    - uses: actions/upload-artifact@v1
+      with:
+        name: Sizer-mac
+        path: out/mac-release/Sizer
+
+  linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v1
+    - name: Ubuntu22 Gcc11
+      env:
+        CC: gcc-11
+        CXX: g++-11
+      run: |
+        cmake -S . --preset=linux-release
+        cmake --build out/linux-release
+        out/linux-release/Sizer
+    - uses: actions/upload-artifact@v1
+      with:
+        name: Sizer-linux
+        path: out/linux-release/Sizer
