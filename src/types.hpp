@@ -12,11 +12,3 @@
 #pragma warning(disable:4018)
 #pragma warning(disable:4267)
 #pragma warning(disable:4244)
-
-inline void sCopyString(char* a, size_t a_len, const char* b, int b_len)
-{
-    if (strncpy_s(a, a_len, b, b_len) != 0)
-    {
-        abort();
-    }
-}

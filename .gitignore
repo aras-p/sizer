@@ -10,3 +10,5 @@
 _ReSharper.*
 build
 /.vs/
+/out/*
+.DS_Store

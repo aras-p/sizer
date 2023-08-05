@@ -4,6 +4,7 @@
 
 #include "pe_utils.hpp"
 #include <stdint.h>
+#include <string.h>
 
 
 #define IMAGE_DOS_SIGNATURE 0x5A4D // MZ
