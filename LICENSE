@@ -1,9 +1,10 @@
-Sizer code written 2008-2017 by Aras Pranckevicius
+Sizer code written 2008-2023 by Aras Pranckevicius
 I hereby place this code in the public domain.
 
-Largely based on .kkrunchy public domain code
+Originally based on .kkrunchy public domain code
 by Fabian "ryg" Giesen,
 https://github.com/farbrausch/fr_public/tree/master/kkrunchy
 
-Source contains CC0-licensed command line parser from
-https://github.com/jibsen/parg
+Source contains third party code:
+- BSD-licensed https://github.com/MolecularMatters/raw_pdb PDB library.
+- CC0-licensed https://github.com/jibsen/parg command line parser.
