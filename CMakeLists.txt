@@ -91,6 +91,17 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_CXX_SIMULATE_ID MATCHES 
 	target_compile_options(Sizer PRIVATE -fdeclspec -fms-extensions)
 endif()
 
+# link to static MSVC runtime
+set_property(TARGET Sizer PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+# Enable debug symbols (RelWithDebInfo is not only that; it also turns on
+# incremental linking, disables some inlining, etc. etc.)
+if (WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Release")
+    target_compile_options(Sizer PRIVATE /Zi)
+    target_link_options(Sizer PRIVATE /DEBUG /OPT:ICF /OPT:REF)
+endif()
+
+
 target_compile_definitions(Sizer PRIVATE
 	_CRT_SECURE_NO_DEPRECATE
 	_CRT_NONSTDC_NO_WARNINGS
