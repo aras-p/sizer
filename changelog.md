@@ -1,3 +1,10 @@
+### 0.6.0, 2023 Aug 6
+
+- When multiple object files have the same filename, disambiguate them (output their folder name in that case too).
+- Object file sizes are counted better, in the case where some of their contributions are without symbols.
+- Sizer output now also lists object files by data size.
+- Slightly improve performance.
+
 ### 0.5.1, 2023 Aug 5
 
 - Sizer now builds on Windows, Mac and Linux. Note that it still only analyzes the *Windows* executables/PDBs, but can do that while running on Mac/Linux.

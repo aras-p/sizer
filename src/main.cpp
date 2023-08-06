@@ -122,9 +122,7 @@ int main(int argc, char * const * argv)
         return 1;
     }
     fprintf(stderr, "\nProcessing info...\n");
-    info.FinishedReading();
-    info.StartAnalyze();
-    info.FinishAnalyze();
+    info.ComputeDerivedData();
 
     fprintf(stderr, "Generating report...\n");
     std::string report = info.WriteReport(filters);

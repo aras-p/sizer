@@ -24,8 +24,8 @@ struct SectionContrib
     uint32_t Offset;
     uint32_t Length;
     uint32_t Compiland;
-    int32_t Type;
-    int32_t ObjFile;
+    SectionType Type;
+    int32_t ObjFileIndex;
 };
 
 struct PDBSymbol
@@ -68,30 +68,27 @@ static const SectionContrib* ContribFromSectionOffset(const SectionContrib* cont
 typedef std::unordered_map<uint32_t, PDBSymbol> RVAToSymbolMap;
 
 
-static void AddSymbol(const SectionContrib* contribs, size_t contribsCount, uint32_t section, uint32_t offset, const std::string& name, uint32_t length, uint32_t rva, DebugInfo& to)
+static void AddSymbol(const SectionContrib* contribs, size_t contribsCount, uint32_t section, uint32_t offset, const std::string& name, uint32_t length, DebugInfo& to)
 {
     const SectionContrib* contrib = ContribFromSectionOffset(contribs, contribsCount, section, offset);
-    int32_t objFile = 0;
-    int32_t sectionType = DIC_UNKNOWN;
+    int32_t objFileIndex = 0;
+    SectionType sectionType = SectionType::Unknown;
     if (contrib)
     {
-        objFile = contrib->ObjFile;
+        objFileIndex = contrib->ObjFileIndex;
         sectionType = contrib->Type;
         if (length == 0)
             length = contrib->Length;
     }
 
-    DISymbol outSym;
-
-    to.Symbols.push_back(DISymbol());
+    SymbolInfo outSym;
     outSym.name = name.empty() ? "<noname>" : name;
-    outSym.objFileNum = objFile;
-    outSym.VA = rva;
-    outSym.Size = length;
-    outSym.Class = sectionType;
-    outSym.NameSpNum = to.GetNameSpaceByName(name.c_str());
+    outSym.objectFileIndex = objFileIndex;
+    outSym.size = length;
+    outSym.sectionType = sectionType;
+    outSym.namespaceIndex = to.GetNameSpaceIndex(name);
 
-    to.Symbols.emplace_back(outSym);
+    to.m_Symbols.emplace_back(outSym);
 }
 
 static void ProcessSymbol(const PDB::ImageSectionStream& imageSectionStream, const PDB::CodeView::DBI::Record* record, RVAToSymbolMap& toMap)
@@ -192,6 +189,7 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
     std::vector<SectionContrib> contributions;
     size_t sectionContribsSize = sectionContributions.GetLength();
     contributions.reserve(sectionContribsSize);
+    to.m_Contribs.reserve(sectionContribsSize);
 
     size_t processedContribsCount = 0;
     for (const PDB::DBI::SectionContribution& srcContrib : sectionContributions)
@@ -221,17 +219,23 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
         bool hasInitData = srcContrib.characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA;
         bool hasUninitData = srcContrib.characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA;
         if (hasCode && !hasInitData && !hasUninitData)
-            contrib.Type = DIC_CODE;
+            contrib.Type = SectionType::Code;
         else if (!hasCode && hasInitData && !hasUninitData)
-            contrib.Type = DIC_DATA;
+            contrib.Type = SectionType::Data;
         else if (!hasCode && !hasInitData && hasUninitData)
-            contrib.Type = DIC_BSS;
+            contrib.Type = SectionType::BSS;
         else
-            contrib.Type = DIC_UNKNOWN;
+            contrib.Type = SectionType::Unknown;
 
         const PDB::ModuleInfoStream::Module& module = moduleInfoStream.GetModule(srcContrib.moduleIndex);
-        contrib.ObjFile = to.GetFileByName(module.GetName().Decay());
+        contrib.ObjFileIndex = to.GetObjectFileIndex(module.GetName().Decay());
         contributions.emplace_back(contrib);
+
+        ContribInfo info;
+        info.objectFileIndex = contrib.ObjFileIndex;
+        info.sectionType = contrib.Type;
+        info.size = contrib.Length;
+        to.m_Contribs.emplace_back(info);
     }
 
     RVAToSymbolMap rvaToSymbol;
@@ -343,7 +347,7 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
         ++addedSymbolCount;
         if ((addedSymbolCount & 65535) == 0)
             fprintf(stderr, "\b\b\b\b\b\b\b\b[%5.1f%%]", 50.0 + addedSymbolCount * 50.0 / symbolCount);
-        AddSymbol(contributions.data(), contributions.size(), sym.section, sym.offset, sym.name, sym.length, sym.rva, to);
+        AddSymbol(contributions.data(), contributions.size(), sym.section, sym.offset, sym.name, sym.length, to);
     }
 }
 

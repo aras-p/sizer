@@ -9,35 +9,15 @@
 #include <map>
 #include <string.h>
 
-uint32_t DebugInfo::CountSizeInClass(int32_t type) const
+uint32_t DebugInfo::CountSizeInSection(SectionType type) const
 {
     uint32_t size = 0;
-    for (int32_t i = 0; i < Symbols.size(); i++)
-        size += (Symbols[i].Class == type) ? Symbols[i].Size : 0;
-
+    for (const auto& sym : m_Symbols)
+    {
+        if (sym.sectionType == type)
+            size += sym.size;
+    }
     return size;
-}
-
-int32_t DebugInfo::MakeStringPtr(const char *s)
-{
-    return MakeStringStd(std::string(s));
-}
-
-int32_t DebugInfo::MakeStringStd(const std::string& str)
-{
-    IndexByStringMap::iterator it = m_IndexByString.find(str);
-    if (it != m_IndexByString.end())
-        return it->second;
-
-    int32_t index = int32_t(m_IndexByString.size());
-    m_IndexByString.insert(std::make_pair(str, index));
-    m_StringByIndex.push_back(str);
-    return index;
-}
-
-bool virtAddressComp(const DISymbol &a, const DISymbol &b)
-{
-    return a.VA < b.VA;
 }
 
 static bool StripTemplateParams(std::string& str)
@@ -74,179 +54,133 @@ static bool StripTemplateParams(std::string& str)
     return isTemplate;
 }
 
-void DebugInfo::FinishedReading()
+void DebugInfo::ComputeDerivedData()
 {
-    // fix strings and aggregate templates
-    typedef std::map<std::string, int> StringIntMap;
-    StringIntMap templateToIndex;
+    std::map<std::string, int> templateToIndex;
 
-    for (int32_t i = 0; i < Symbols.size(); i++)
+    for (const auto& sym : m_Symbols)
     {
-        DISymbol *sym = &Symbols[i];
-
-        std::string templateName = sym->name;
+        // aggregate templates
+        std::string templateName = sym.name;
         bool isTemplate = StripTemplateParams(templateName);
         if (isTemplate)
         {
-            StringIntMap::iterator it = templateToIndex.find(templateName);
+            auto it = templateToIndex.find(templateName);
             int index;
             if (it != templateToIndex.end())
             {
                 index = it->second;
-                Templates[index].size += sym->Size;
-                Templates[index].count++;
+                m_Templates[index].size += sym.size;
+                m_Templates[index].count++;
             }
             else
             {
-                index = int(Templates.size());
+                index = int(m_Templates.size());
                 templateToIndex.insert(std::make_pair(templateName, index));
-                TemplateSymbol tsym;
-                tsym.name = templateName;
-                tsym.count = 1;
-                tsym.size = sym->Size;
-                Templates.push_back(tsym);
+                TemplateInfo info;
+                info.name = templateName;
+                info.count = 1;
+                info.size = sym.size;
+                m_Templates.emplace_back(info);
             }
+        }
+
+        // aggregate object file / namespace sizes
+        if (sym.sectionType == SectionType::Code)
+        {
+            m_ObjectFiles[sym.objectFileIndex].codeSize += sym.size;
+            m_Namespaces[sym.namespaceIndex].codeSize += sym.size;
+        }
+        else if (sym.sectionType == SectionType::Data)
+        {
+            m_ObjectFiles[sym.objectFileIndex].dataSize += sym.size;
+            m_Namespaces[sym.namespaceIndex].dataSize += sym.size;
         }
     }
 
-    // sort symbols by virtual address
-    std::sort(Symbols.begin(), Symbols.end(), virtAddressComp);
+    for (const auto& ctr : m_Contribs)
+    {
+        // aggregate object file / namespace sizes
+        if (ctr.sectionType == SectionType::Code)
+        {
+            m_ObjectFiles[ctr.objectFileIndex].contribCodeSize += ctr.size;
+        }
+        else if (ctr.sectionType == SectionType::Data)
+        {
+            m_ObjectFiles[ctr.objectFileIndex].contribDataSize += ctr.size;
+        }
+    }
 }
 
-int32_t DebugInfo::GetFile(int32_t fileName)
+static void splitPath(const std::string& path, std::string& outDir, std::string& outFile)
 {
-    for (int32_t i = 0; i < m_Files.size(); i++)
-        if (m_Files[i].fileName == fileName)
-            return i;
-
-    m_Files.push_back(DISymFile());
-    DISymFile *file = &m_Files.back();
-    file->fileName = fileName;
-    file->codeSize = file->dataSize = 0;
-
-    return int32_t(m_Files.size() - 1);
+    size_t pos = path.find_last_of("/\\");
+    if (pos != std::string::npos)
+    {
+        outDir = path.substr(0, pos);
+        outFile = path.substr(pos + 1);
+    }
+    else
+    {
+        outDir = "";
+        outFile = path;
+    }
 }
 
-int32_t DebugInfo::GetFileByName(const char *objName)
+int32_t DebugInfo::GetObjectFileIndex(const char* pathStr)
 {
-    char *p;
-
-    // skip path seperators
-    while ((p = (char*)strchr(objName, '\\')))
-        objName = p + 1;
-
-    while ((p = (char*)strchr(objName, '/')))
-        objName = p + 1;
-
-    return GetFile(MakeStringPtr(objName));
-}
-
-int32_t DebugInfo::GetNameSpace(int32_t name)
-{
-    const auto it = m_NameSpaceIndexByName.find(name);
-    if (it != m_NameSpaceIndexByName.end())
+    std::string path = pathStr;
+    auto it = m_ObjectPathToIndex.find(path);
+    if (it != m_ObjectPathToIndex.end())
         return it->second;
 
-    DISymNameSp namesp;
-    namesp.name = name;
-    namesp.codeSize = namesp.dataSize = 0;
-    NameSps.push_back(namesp);
+    std::string dir, file;
+    splitPath(path, dir, file);
 
-    int32_t index = int32_t(NameSps.size() - 1);
-    m_NameSpaceIndexByName.insert({name, index});
+    ObjectFileInfo info;
+    info.fileDir = dir;
+    info.fileName = file;
+
+    int32_t index = int32_t(m_ObjectPathToIndex.size());
+    info.index = index;
+
+    m_ObjectFiles.emplace_back(info);
+    m_ObjectPathToIndex.insert(it, {path, index});
+    m_ObjectNameToFolders[file].insert(dir);
     return index;
 }
 
-int32_t DebugInfo::GetNameSpaceByName(const char *name)
+std::string DebugInfo::GetObjectFileDesc(int index) const
 {
-    const char *pp = name - 2;
-    char *p;
-    int32_t cname;
+    const ObjectFileInfo& info = m_ObjectFiles[index];
+    const auto it = m_ObjectNameToFolders.find(info.fileName);
+    if (it == m_ObjectNameToFolders.end() || it->second.size() < 2)
+        return info.fileName;
+    return info.fileName + " (" + info.fileDir + ")";
+}
 
-    while ((p = (char*)strstr(pp + 2, "::")))
-        pp = p;
-
-    while ((p = (char*)strchr(pp + 1, '.')))
-        pp = p;
-
-    if (pp != name - 2)
-    {
-        char buffer[2048];
-        strncpy(buffer, name, sizeof(buffer)-1);
-
-        if (pp - name < 2048)
-            buffer[pp - name] = 0;
-
-        cname = MakeStringPtr(buffer);
-    }
+int32_t DebugInfo::GetNameSpaceIndex(const std::string& symName)
+{
+    std::string space;
+    size_t pos = symName.rfind("::");
+    if (pos == std::string::npos || pos == 0)
+        space = "<global>";
     else
-        cname = MakeStringPtr("<global>");
+        space = symName.substr(0, pos);
 
-    return GetNameSpace(cname);
-}
+    const auto it = m_NamespaceToIndex.find(space);
+    if (it != m_NamespaceToIndex.end())
+        return it->second;
 
-void DebugInfo::StartAnalyze()
-{
-    int32_t i;
+    NamespaceInfo info;
+    info.name = space;
 
-    for (i = 0; i < m_Files.size(); i++)
-    {
-        m_Files[i].codeSize = m_Files[i].dataSize = 0;
-    }
+    int32_t index = int32_t(m_NamespaceToIndex.size());
+    info.index = index;
 
-    for (i = 0; i < NameSps.size(); i++)
-    {
-        NameSps[i].codeSize = NameSps[i].dataSize = 0;
-    }
-}
-
-void DebugInfo::FinishAnalyze()
-{
-    int32_t i;
-
-    for (i = 0; i < Symbols.size(); i++)
-    {
-        if (Symbols[i].Class == DIC_CODE)
-        {
-            m_Files[Symbols[i].objFileNum].codeSize += Symbols[i].Size;
-            NameSps[Symbols[i].NameSpNum].codeSize += Symbols[i].Size;
-        }
-        else if (Symbols[i].Class == DIC_DATA)
-        {
-            m_Files[Symbols[i].objFileNum].dataSize += Symbols[i].Size;
-            NameSps[Symbols[i].NameSpNum].dataSize += Symbols[i].Size;
-        }
-    }
-}
-
-static bool symSizeComp(const DISymbol &a, const DISymbol &b)
-{
-    if (a.Size != b.Size)
-        return a.Size > b.Size;
-    return a.VA < b.VA;
-}
-
-static bool templateSizeComp(const TemplateSymbol& a, const TemplateSymbol& b)
-{
-    if (a.size != b.size)
-        return a.size > b.size;
-    if (a.count != b.count)
-        return a.count > b.count;
-    return a.name.length() < b.name.length();
-}
-
-static bool nameCodeSizeComp(const DISymNameSp &a, const DISymNameSp &b)
-{
-    if (a.codeSize != b.codeSize)
-        return a.codeSize > b.codeSize;
-    return a.dataSize > b.dataSize;
-}
-
-static bool fileCodeSizeComp(const DISymFile &a, const DISymFile &b)
-{
-    if (a.codeSize != b.codeSize)
-        return a.codeSize > b.codeSize;
-    return a.dataSize > b.dataSize;
+    m_Namespaces.emplace_back(info);
+    m_NamespaceToIndex.insert(it, { space, index });
+    return index;
 }
 
 static void sAppendPrintF(std::string &str, const char *format, ...)
@@ -266,11 +200,9 @@ static void sAppendPrintF(std::string &str, const char *format, ...)
 std::string DebugInfo::WriteReport(const DebugFilters& filters)
 {
     std::string Report;
-    int32_t i; //,j;
-    uint32_t size;
     const char* filterName = filters.name.empty() ? NULL : filters.name.c_str();
 
-    Report.reserve(16384); // start out with 16k space
+    Report.reserve(64 * 1024);
     if (filterName)
     {
         sAppendPrintF(Report, "Only including things with '%s' in their name/file\n\n", filterName);
@@ -278,148 +210,211 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
 
     // symbols
     sAppendPrintF(Report, "Functions by size (kilobytes, min %.2f):\n", filters.minFunction/1024.0);
-    std::sort(Symbols.begin(), Symbols.end(), symSizeComp);
+    std::sort(m_Symbols.begin(), m_Symbols.end(), [](const auto& a, const auto& b) {
+        if (a.size != b.size)
+            return a.size > b.size;
+        if (a.objectFileIndex != b.objectFileIndex)
+            return a.objectFileIndex < b.objectFileIndex;
+        return a.name < b.name;
+    });
 
-    for (i = 0; i < Symbols.size(); i++)
+    for (const auto& sym : m_Symbols)
     {
-        if (Symbols[i].Size < filters.minFunction)
+        if (sym.size < filters.minFunction)
             break;
-        if (Symbols[i].Class == DIC_CODE)
+        if (sym.sectionType == SectionType::Code)
         {
-            const char* name1 = Symbols[i].name.c_str();
-            const char* name2 = GetStringPrep(m_Files[Symbols[i].objFileNum].fileName);
-            if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
+            const char* name1 = sym.name.c_str();
+            std::string objFile = GetObjectFileDesc(sym.objectFileIndex);
+            if (filterName && !strstr(name1, filterName) && !strstr(objFile.c_str(), filterName))
                 continue;
             sAppendPrintF(Report, "%5d.%02d: %-80s %s\n",
-                Symbols[i].Size / 1024, (Symbols[i].Size % 1024) * 100 / 1024,
-                name1, name2);
+                sym.size / 1024, (sym.size % 1024) * 100 / 1024,
+                name1, objFile.c_str());
         }
     }
 
     // templates
     sAppendPrintF(Report, "\nAggregated templates by size (kilobytes, min %.2f / %i):\n", filters.minTemplate/1024.0, filters.minTemplateCount);
 
-    std::sort(Templates.begin(), Templates.end(), templateSizeComp);
+    std::sort(m_Templates.begin(), m_Templates.end(), [](const auto& a, const auto& b) {
+        if (a.size != b.size)
+            return a.size > b.size;
+        if (a.count != b.count)
+            return a.count > b.count;
+        return a.name < b.name;
+    });
 
-    for (i = 0; i < Templates.size(); i++)
+    for (const auto& tpl : m_Templates)
     {
-        if (Templates[i].size < filters.minTemplate)
+        if (tpl.size < filters.minTemplate)
             break;
-        if (Templates[i].count < filters.minTemplateCount)
+        if (tpl.count < filters.minTemplateCount)
             continue;
-        const char* name1 = Templates[i].name.c_str();
+        const char* name1 = tpl.name.c_str();
         if (filterName && !strstr(name1, filterName))
             continue;
         sAppendPrintF(Report, "%5d.%02d #%5d: %s\n",
-            Templates[i].size / 1024, (Templates[i].size % 1024) * 100 / 1024,
-            Templates[i].count,
+            tpl.size / 1024, (tpl.size % 1024) * 100 / 1024,
+            tpl.count,
             name1);
     }
 
     sAppendPrintF(Report, "\nData by size (kilobytes, min %.2f):\n", filters.minData/1024.0);
-    for (i = 0; i < Symbols.size(); i++)
+    for (const auto& sym : m_Symbols)
     {
-        if (Symbols[i].Size < filters.minData)
+        if (sym.size < filters.minData)
             break;
-        if (Symbols[i].Class == DIC_DATA)
+        if (sym.sectionType == SectionType::Data)
         {
-            const char* name1 = Symbols[i].name.c_str();
-            const char* name2 = GetStringPrep(m_Files[Symbols[i].objFileNum].fileName);
-            if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
+            const char* name1 = sym.name.c_str();
+            std::string objFile = GetObjectFileDesc(sym.objectFileIndex);
+            if (filterName && !strstr(name1, filterName) && !strstr(objFile.c_str(), filterName))
                 continue;
             sAppendPrintF(Report, "%5d.%02d: %-50s %s\n",
-                Symbols[i].Size / 1024, (Symbols[i].Size % 1024) * 100 / 1024,
-                name1, name2);
+                sym.size / 1024, (sym.size % 1024) * 100 / 1024,
+                name1, objFile.c_str());
         }
     }
 
     sAppendPrintF(Report, "\nBSS by size (kilobytes, min %.2f):\n", filters.minData/1024.0);
-    for (i = 0; i < Symbols.size(); i++)
+    for (const auto& sym : m_Symbols)
     {
-        if (Symbols[i].Size < filters.minData)
+        if (sym.size < filters.minData)
             break;
-        if (Symbols[i].Class == DIC_BSS)
+        if (sym.sectionType == SectionType::BSS)
         {
-            const char* name1 = Symbols[i].name.c_str();
-            const char* name2 = GetStringPrep(m_Files[Symbols[i].objFileNum].fileName);
-            if (filterName && !strstr(name1, filterName) && !strstr(name2, filterName))
+            const char* name1 = sym.name.c_str();
+            std::string objFile = GetObjectFileDesc(sym.objectFileIndex);
+            if (filterName && !strstr(name1, filterName) && !strstr(objFile.c_str(), filterName))
                 continue;
             sAppendPrintF(Report, "%5d.%02d: %-50s %s\n",
-                Symbols[i].Size / 1024, (Symbols[i].Size % 1024) * 100 / 1024,
-                name1, name2);
+                sym.size / 1024, (sym.size % 1024) * 100 / 1024,
+                name1, objFile.c_str());
         }
     }
 
-    /*
-    _snprintf(Report,512,"\nFunctions by object file and size:\n");
-    Report += strlen(Report);
-
-    for(i=1;i<Symbols.size();i++)
-      for(j=i;j>0;j--)
-      {
-        int32_t f1 = Symbols[j].FileNum;
-        int32_t f2 = Symbols[j-1].FileNum;
-
-        if(f1 == -1 || f2 != -1 && stricmp(Files[f1].Name.String,Files[f2].Name.String) < 0)
-          std::swap(Symbols[j],Symbols[j-1]);
-      }
-
-    for(i=0;i<Symbols.size();i++)
-    {
-      if(Symbols[i].Class == DIC_CODE)
-      {
-        _snprintf(Report,512,"%5d.%02d: %-50s %s\n",
-          Symbols[i].Size/1024,(Symbols[i].Size%1024)*100/1024,
-          Symbols[i].Name,Files[Symbols[i].FileNum].Name);
-
-        Report += strlen(Report);
-      }
-    }
-    */
-
     sAppendPrintF(Report, "\nClasses/Namespaces by code size (kilobytes, min %.2f):\n", filters.minClass/1024.0);
-    std::sort(NameSps.begin(), NameSps.end(), nameCodeSizeComp);
-
-    for (i = 0; i < NameSps.size(); i++)
+    std::vector<NamespaceInfo> nameSpaces;
+    for (const auto& n : m_Namespaces)
     {
-        if (NameSps[i].codeSize < filters.minClass)
-            break;
-        const char* name1 = GetStringPrep(NameSps[i].name);
-        if (filterName && !strstr(name1, filterName))
+        if (n.codeSize >= filters.minClass)
+            nameSpaces.push_back(n);
+    }
+    std::sort(nameSpaces.begin(), nameSpaces.end(), [](const auto& a, const auto& b)
+    {
+        if (a.codeSize != b.codeSize)
+            return a.codeSize > b.codeSize;
+        if (a.dataSize != b.dataSize)
+            return a.dataSize > b.dataSize;
+        return a.name < b.name;
+    });
+    for (const auto& n : nameSpaces)
+    {
+        const std::string& name = n.name;
+        if (filterName && !strstr(name.c_str(), filterName))
             continue;
         sAppendPrintF(Report, "%5d.%02d: %s\n",
-            NameSps[i].codeSize / 1024, (NameSps[i].codeSize % 1024) * 100 / 1024, name1);
+            n.codeSize / 1024, (n.codeSize % 1024) * 100 / 1024, name.c_str());
     }
 
     sAppendPrintF(Report, "\nObject files by code size (kilobytes, min %.2f):\n", filters.minFile/1024.0);
-    std::sort(m_Files.begin(), m_Files.end(), fileCodeSizeComp);
-
-    for (i = 0; i < m_Files.size(); i++)
+    std::vector<ObjectFileInfo> objectFiles;
+    for (const auto& f : m_ObjectFiles)
     {
-        if (m_Files[i].codeSize < filters.minFile)
-            break;
-        const char* name1 = GetStringPrep(m_Files[i].fileName);
-        if (filterName && !strstr(name1, filterName))
+        if (f.codeSize >= filters.minFile || f.contribCodeSize >= filters.minFile)
+            objectFiles.push_back(f);
+    }
+    std::sort(objectFiles.begin(), objectFiles.end(), [](const ObjectFileInfo& a, const ObjectFileInfo& b) {
+        if (a.contribCodeSize != b.contribCodeSize)
+            return a.contribCodeSize > b.contribCodeSize;
+        if (a.codeSize != b.codeSize)
+            return a.codeSize > b.codeSize;
+        return a.index < b.index;
+    });
+    for (const auto& f : objectFiles)
+    {
+        std::string objFile = GetObjectFileDesc(f.index);
+        if (filterName && !strstr(objFile.c_str(), filterName))
             continue;
-        sAppendPrintF(Report, "%5d.%02d: %s\n", m_Files[i].codeSize / 1024,
-            (m_Files[i].codeSize % 1024) * 100 / 1024, name1);
+
+        if (f.codeSize * 1.2f >= f.contribCodeSize)
+        {
+            sAppendPrintF(Report, "%5d.%02d: %s\n",
+                f.contribCodeSize / 1024, (f.contribCodeSize % 1024) * 100 / 1024,
+                objFile.c_str());
+        }
+        else
+        {
+            sAppendPrintF(Report, "%5d.%02d: %s [%d.%02d with symbols]\n",
+                f.contribCodeSize / 1024, (f.contribCodeSize % 1024) * 100 / 1024,
+                objFile.c_str(),
+                f.codeSize / 1024, (f.codeSize % 1024) * 100 / 1024);
+        }
     }
 
-    size = CountSizeInClass(DIC_CODE);
-    sAppendPrintF(Report, "\nOverall code:  %5d.%02d kb\n", size / 1024,
-        (size % 1024) * 100 / 1024);
+    sAppendPrintF(Report, "\nObject files by data size (kilobytes, min %.2f):\n", filters.minFile / 1024.0);
+    objectFiles.clear();
+    for (const auto& f : m_ObjectFiles)
+    {
+        if (f.dataSize >= filters.minFile || f.contribDataSize >= filters.minFile)
+            objectFiles.push_back(f);
+    }
+    std::sort(objectFiles.begin(), objectFiles.end(), [](const ObjectFileInfo& a, const ObjectFileInfo& b) {
+        if (a.contribDataSize != b.contribDataSize)
+            return a.contribDataSize > b.contribDataSize;
+        if (a.dataSize != b.dataSize)
+            return a.dataSize > b.dataSize;
+        return a.index < b.index;
+        });
+    for (const auto& f : objectFiles)
+    {
+        std::string objFile = GetObjectFileDesc(f.index);
+        if (filterName && !strstr(objFile.c_str(), filterName))
+            continue;
 
-    size = CountSizeInClass(DIC_DATA);
-    sAppendPrintF(Report, "Overall data:  %5d.%02d kb\n", size / 1024,
-        (size % 1024) * 100 / 1024);
+        if (f.dataSize * 1.2f >= f.contribDataSize)
+        {
+            sAppendPrintF(Report, "%5d.%02d: %s\n",
+                f.contribDataSize / 1024, (f.contribDataSize % 1024) * 100 / 1024,
+                objFile.c_str());
+        }
+        else
+        {
+            sAppendPrintF(Report, "%5d.%02d: %s [%d.%02d with symbols]\n",
+                f.contribDataSize / 1024, (f.contribDataSize % 1024) * 100 / 1024,
+                objFile.c_str(),
+                f.dataSize / 1024, (f.dataSize % 1024) * 100 / 1024);
+        }
+    }
 
-    size = CountSizeInClass(DIC_BSS);
+
+    uint32_t contribCodeSize = 0, contribDataSize = 0;
+    for (const auto& cnt : m_Contribs)
+    {
+        if (cnt.sectionType == SectionType::Code)
+            contribCodeSize += cnt.size;
+        if (cnt.sectionType == SectionType::Data)
+            contribDataSize += cnt.size;
+    }
+
+    uint32_t size;
+    size = CountSizeInSection(SectionType::Code);
+    sAppendPrintF(Report, "\nOverall code:  %5d.%02d kb (%d.%02d with symbols)\n", contribCodeSize / 1024, (contribCodeSize % 1024) * 100 / 1024, size / 1024, (size % 1024) * 100 / 1024);
+
+    size = CountSizeInSection(SectionType::Data);
+    sAppendPrintF(Report, "Overall data:  %5d.%02d kb (%d.%02d with symbols)\n", contribDataSize / 1024, (contribDataSize % 1024) * 100 / 1024, size / 1024, (size % 1024) * 100 / 1024);
+
+    size = CountSizeInSection(SectionType::BSS);
     sAppendPrintF(Report, "Overall BSS:   %5d.%02d kb\n", size / 1024,
         (size % 1024) * 100 / 1024);
 
-    size = CountSizeInClass(DIC_UNKNOWN);
-    sAppendPrintF(Report, "Overall other: %5d.%02d kb\n", size / 1024,
-        (size % 1024) * 100 / 1024);
+    size = CountSizeInSection(SectionType::Unknown);
+    if (size > 0)
+    {
+        sAppendPrintF(Report, "Overall other: %5d.%02d kb\n", size / 1024,
+            (size % 1024) * 100 / 1024);
+    }
 
     return Report;
 }

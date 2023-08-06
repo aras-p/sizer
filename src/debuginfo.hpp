@@ -3,48 +3,61 @@
 // Based on code by Fabian "ryg" Giesen, http://farbrausch.com/~fg/
 // Public domain.
 
-#ifndef __DEBUGINFO_HPP__
-#define __DEBUGINFO_HPP__
+#pragma once
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
-#define DIC_END     0
-#define DIC_CODE    1
-#define DIC_DATA    2
-#define DIC_BSS     3 // uninitialized data
-#define DIC_UNKNOWN 4
-
-struct DISymFile // File
+enum class SectionType
 {
-    int32_t  fileName;
-    uint32_t  codeSize;
-    uint32_t  dataSize;
+    Unknown,
+    Code,
+    Data,
+    BSS,
 };
 
-struct DISymNameSp // Namespace
-{
-    int32_t  name;
-    uint32_t  codeSize;
-    uint32_t  dataSize;
-};
-
-struct DISymbol
+struct SymbolInfo
 {
     std::string name;
-    int32_t NameSpNum;
-    int32_t objFileNum;
-    uint32_t VA;
-    uint32_t Size;
-    int32_t Class;
+    int32_t namespaceIndex = 0;
+    int32_t objectFileIndex = 0;
+    uint32_t size = 0;
+    SectionType sectionType = SectionType::Unknown;
 };
 
-struct TemplateSymbol
+struct ContribInfo
+{
+    int32_t objectFileIndex = 0;
+    uint32_t size = 0;
+    SectionType sectionType = SectionType::Unknown;
+};
+
+struct ObjectFileInfo
+{
+    std::string fileDir;
+    std::string fileName;
+    int32_t index = 0;
+    uint32_t codeSize = 0;
+    uint32_t dataSize = 0;
+    uint32_t contribCodeSize = 0;
+    uint32_t contribDataSize = 0;
+};
+
+struct NamespaceInfo
 {
     std::string name;
-    uint32_t size;
-    uint32_t count;
+    int32_t index = 0;
+    uint32_t  codeSize = 0;
+    uint32_t  dataSize = 0;
+};
+
+struct TemplateInfo
+{
+    std::string name;
+    uint32_t size = 0;
+    uint32_t count = 0;
 };
 
 struct DebugFilters
@@ -65,45 +78,28 @@ struct DebugFilters
 
 class DebugInfo
 {
-    typedef std::vector<std::string>   StringByIndexVector;
-    typedef std::map<std::string, int32_t> IndexByStringMap;
-    typedef std::map<int32_t, int32_t> NameIndexToArrayIndexMap;
-
-    StringByIndexVector m_StringByIndex;
-    IndexByStringMap  m_IndexByString;
-    NameIndexToArrayIndexMap m_NameSpaceIndexByName;
-
-    uint32_t CountSizeInClass(int32_t type) const;
-
 public:
-    std::vector<DISymbol>  Symbols;
-    std::vector<TemplateSymbol>  Templates;
-    std::vector<DISymFile> m_Files;
-    std::vector<DISymNameSp> NameSps;
+    std::vector<SymbolInfo>  m_Symbols;
+    std::vector<ContribInfo> m_Contribs;
 
-    int32_t MakeStringPtr(const char *s);
-    int32_t MakeStringStd(const std::string& s);
-    const char* GetStringPrep(int32_t index) const { return m_StringByIndex[index].c_str(); }
+    int32_t GetObjectFileIndex(const char* pathStr);
+    int32_t GetNameSpaceIndex(const std::string& symName);
 
-    void FinishedReading();
-
-    int32_t GetFile(int32_t fileName);
-    int32_t GetFileByName(const char *objName);
-
-    int32_t GetNameSpace(int32_t name);
-    int32_t GetNameSpaceByName(const char *name);
-
-    void StartAnalyze();
-    void FinishAnalyze();
+    void ComputeDerivedData();
 
     std::string WriteReport(const DebugFilters& filters);
+
+private:
+    uint32_t CountSizeInSection(SectionType type) const;
+    std::string GetObjectFileDesc(int index) const;
+
+private:
+    std::vector<NamespaceInfo> m_Namespaces;
+    std::map<std::string, int32_t> m_NamespaceToIndex;
+
+    std::vector<ObjectFileInfo> m_ObjectFiles;
+    std::map<std::string, int32_t> m_ObjectPathToIndex;
+    std::map<std::string, std::set<std::string>> m_ObjectNameToFolders;
+
+    std::vector<TemplateInfo> m_Templates;
 };
-
-class DebugInfoReader
-{
-public:
-    virtual bool ReadDebugInfo(const char *fileName, DebugInfo &to) = 0;
-};
-
-
-#endif
