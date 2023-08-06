@@ -189,6 +189,7 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
     std::vector<SectionContrib> contributions;
     size_t sectionContribsSize = sectionContributions.GetLength();
     contributions.reserve(sectionContribsSize);
+    to.m_Contribs.reserve(sectionContribsSize);
 
     size_t processedContribsCount = 0;
     for (const PDB::DBI::SectionContribution& srcContrib : sectionContributions)
@@ -229,6 +230,12 @@ static void ReadEverything(const PDB::RawFile& rawPdbFile, const PDB::DBIStream&
         const PDB::ModuleInfoStream::Module& module = moduleInfoStream.GetModule(srcContrib.moduleIndex);
         contrib.ObjFileIndex = to.GetObjectFileIndex(module.GetName().Decay());
         contributions.emplace_back(contrib);
+
+        ContribInfo info;
+        info.objectFileIndex = contrib.ObjFileIndex;
+        info.sectionType = contrib.Type;
+        info.size = contrib.Length;
+        to.m_Contribs.emplace_back(info);
     }
 
     RVAToSymbolMap rvaToSymbol;

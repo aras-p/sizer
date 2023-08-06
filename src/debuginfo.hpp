@@ -27,6 +27,13 @@ struct SymbolInfo
     SectionType sectionType = SectionType::Unknown;
 };
 
+struct ContribInfo
+{
+    int32_t objectFileIndex = 0;
+    uint32_t size = 0;
+    SectionType sectionType = SectionType::Unknown;
+};
+
 struct ObjectFileInfo
 {
     std::string fileDir;
@@ -34,6 +41,8 @@ struct ObjectFileInfo
     int32_t index = 0;
     uint32_t codeSize = 0;
     uint32_t dataSize = 0;
+    uint32_t contribCodeSize = 0;
+    uint32_t contribDataSize = 0;
 };
 
 struct NamespaceInfo
@@ -71,6 +80,7 @@ class DebugInfo
 {
 public:
     std::vector<SymbolInfo>  m_Symbols;
+    std::vector<ContribInfo> m_Contribs;
 
     int32_t GetObjectFileIndex(const char* pathStr);
     int32_t GetNameSpaceIndex(const std::string& symName);

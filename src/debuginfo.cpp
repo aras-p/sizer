@@ -97,6 +97,19 @@ void DebugInfo::ComputeDerivedData()
             m_Namespaces[sym.namespaceIndex].dataSize += sym.size;
         }
     }
+
+    for (const auto& ctr : m_Contribs)
+    {
+        // aggregate object file / namespace sizes
+        if (ctr.sectionType == SectionType::Code)
+        {
+            m_ObjectFiles[ctr.objectFileIndex].contribCodeSize += ctr.size;
+        }
+        else if (ctr.sectionType == SectionType::Data)
+        {
+            m_ObjectFiles[ctr.objectFileIndex].contribDataSize += ctr.size;
+        }
+    }
 }
 
 static void splitPath(const std::string& path, std::string& outDir, std::string& outFile)
@@ -309,14 +322,14 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
     std::vector<ObjectFileInfo> objectFiles;
     for (const auto& f : m_ObjectFiles)
     {
-        if (f.codeSize >= filters.minFile)
+        if (f.codeSize >= filters.minFile || f.contribCodeSize >= filters.minFile)
             objectFiles.push_back(f);
     }
-    std::sort(objectFiles.begin(), objectFiles.end(), [](const auto& a, const auto& b) {
+    std::sort(objectFiles.begin(), objectFiles.end(), [](const ObjectFileInfo& a, const ObjectFileInfo& b) {
+        if (a.contribCodeSize != b.contribCodeSize)
+            return a.contribCodeSize > b.contribCodeSize;
         if (a.codeSize != b.codeSize)
             return a.codeSize > b.codeSize;
-        if (a.dataSize != b.dataSize)
-            return a.dataSize > b.dataSize;
         return a.index < b.index;
     });
     for (const auto& f : objectFiles)
@@ -324,18 +337,73 @@ std::string DebugInfo::WriteReport(const DebugFilters& filters)
         std::string objFile = GetObjectFileDesc(f.index);
         if (filterName && !strstr(objFile.c_str(), filterName))
             continue;
-        sAppendPrintF(Report, "%5d.%02d: %s\n", f.codeSize / 1024,
-            (f.codeSize % 1024) * 100 / 1024, objFile.c_str());
+
+        if (f.codeSize * 1.2f >= f.contribCodeSize)
+        {
+            sAppendPrintF(Report, "%5d.%02d: %s\n",
+                f.contribCodeSize / 1024, (f.contribCodeSize % 1024) * 100 / 1024,
+                objFile.c_str());
+        }
+        else
+        {
+            sAppendPrintF(Report, "%5d.%02d: %s [%d.%02d with symbols]\n",
+                f.contribCodeSize / 1024, (f.contribCodeSize % 1024) * 100 / 1024,
+                objFile.c_str(),
+                f.codeSize / 1024, (f.codeSize % 1024) * 100 / 1024);
+        }
+    }
+
+    sAppendPrintF(Report, "\nObject files by data size (kilobytes, min %.2f):\n", filters.minFile / 1024.0);
+    objectFiles.clear();
+    for (const auto& f : m_ObjectFiles)
+    {
+        if (f.dataSize >= filters.minFile || f.contribDataSize >= filters.minFile)
+            objectFiles.push_back(f);
+    }
+    std::sort(objectFiles.begin(), objectFiles.end(), [](const ObjectFileInfo& a, const ObjectFileInfo& b) {
+        if (a.contribDataSize != b.contribDataSize)
+            return a.contribDataSize > b.contribDataSize;
+        if (a.dataSize != b.dataSize)
+            return a.dataSize > b.dataSize;
+        return a.index < b.index;
+        });
+    for (const auto& f : objectFiles)
+    {
+        std::string objFile = GetObjectFileDesc(f.index);
+        if (filterName && !strstr(objFile.c_str(), filterName))
+            continue;
+
+        if (f.dataSize * 1.2f >= f.contribDataSize)
+        {
+            sAppendPrintF(Report, "%5d.%02d: %s\n",
+                f.contribDataSize / 1024, (f.contribDataSize % 1024) * 100 / 1024,
+                objFile.c_str());
+        }
+        else
+        {
+            sAppendPrintF(Report, "%5d.%02d: %s [%d.%02d with symbols]\n",
+                f.contribDataSize / 1024, (f.contribDataSize % 1024) * 100 / 1024,
+                objFile.c_str(),
+                f.dataSize / 1024, (f.dataSize % 1024) * 100 / 1024);
+        }
+    }
+
+
+    uint32_t contribCodeSize = 0, contribDataSize = 0;
+    for (const auto& cnt : m_Contribs)
+    {
+        if (cnt.sectionType == SectionType::Code)
+            contribCodeSize += cnt.size;
+        if (cnt.sectionType == SectionType::Data)
+            contribDataSize += cnt.size;
     }
 
     uint32_t size;
     size = CountSizeInSection(SectionType::Code);
-    sAppendPrintF(Report, "\nOverall code:  %5d.%02d kb\n", size / 1024,
-        (size % 1024) * 100 / 1024);
+    sAppendPrintF(Report, "\nOverall code:  %5d.%02d kb (%d.%02d with symbols)\n", contribCodeSize / 1024, (contribCodeSize % 1024) * 100 / 1024, size / 1024, (size % 1024) * 100 / 1024);
 
     size = CountSizeInSection(SectionType::Data);
-    sAppendPrintF(Report, "Overall data:  %5d.%02d kb\n", size / 1024,
-        (size % 1024) * 100 / 1024);
+    sAppendPrintF(Report, "Overall data:  %5d.%02d kb (%d.%02d with symbols)\n", contribDataSize / 1024, (contribDataSize % 1024) * 100 / 1024, size / 1024, (size % 1024) * 100 / 1024);
 
     size = CountSizeInSection(SectionType::BSS);
     sAppendPrintF(Report, "Overall BSS:   %5d.%02d kb\n", size / 1024,
